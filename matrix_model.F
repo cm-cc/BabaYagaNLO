@@ -2711,8 +2711,7 @@ c$$$      return
          x2=x
 
 *****FOR PIONS NO FURTHER CORRECTION NEEDED, EIKONAL ALREADY TAKES INTO ACCOUNT THE MASS TERM.
-	if(fs.eq.'pr') x2=0.d0
-
+        if(fs.eq.'pr'.or.fs.eq.'pp') x2=0.d0
         singlephoton = -(
      .          (dot(p1,p1)*oop1dk**2
      .        + dot(p2,p2)*oop2dk**2)*(1d0-x1**2/(1d0+(1d0-x1)**2))

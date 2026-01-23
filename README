@@ -14,30 +14,30 @@ Default compilation is performed with main.F and produces the executable 'babaya
 
 A template main (driver driver_gen_events.F) is provided,
 containing a minimal version of a main program calling the wrapper routine to generate events.
-To compile the wrapped version of the main just run 
+To compile the wrapped version of the main just run
 
-        make libbabayagafull.a
+	make libbabayagafull.a
 	gfortran -O3 -fPIC driver_gen_events.F libbabayagafull.a -o babayaga-wrap
 
 
 External programs
 --------------------------
 In BabaYaga, we make use of the following external programs:
-->	RECOLA     (https://recola.gitlab.io/)
-->	COLLIER    (https://collier.hepforge.org/)
-->	LOOPTOOLS  (https://feynarts.de/looptools/)
-
+-> RECOLA     (https://recola.gitlab.io/)
+-> COLLIER    (https://collier.hepforge.org/)
+-> LOOPTOOLS  (https://feynarts.de/looptools/)
+-> RANLUX (C version) (https://luscher.web.cern.ch/luscher/ranlux/)  
 
 Vacuum polarization choice
 --------------------------
 In BabaYaga, the hadronic contribution to the vacuum polarization can be
 calculated by means of three different routines:
 -> (default) NSK, Novosibirsk parameterization by Fedor Ignatov
-   http://cmd.inp.nsk.su/~ignatov/vpl/
--> HADR5N16, by F. Jegerlehner (see:
-   http://www-com.physik.hu-berlin.de/~fjeger/
--> HMNT, by K. Hagiwara, A.D. Martin, D. Nomura and T. Teubner (see: Phys.
-   Rev. D, 2004, 69:093003; Phys. Lett. B, 2007, 649:173).
+   (http://cmd.inp.nsk.su/~ignatov/vpl/)
+-> HADR5N16, by F. Jegerlehner 
+   (http://www-com.physik.hu-berlin.de/~fjeger/)
+-> HMNT, by K. Hagiwara, A.D. Martin, D. Nomura and T. Teubner
+   (see: Phys. Rev. D, 2004, 69:093003; Phys. Lett. B, 2007, 649:173).
 
 You can choose it in the interactive menu. Please notice that
 the 'HMNT' and 'HADR5N16' routines are not reliable on top of the narrow resonances,
@@ -84,7 +84,6 @@ from the following options:
 ->  phokhara
 ->  bern
 
-
 When you run BabaYaga, enter at the prompt the variable and value you want to
 change and then type 'run'. You can also type `legenda` to print a brief
 description of the input parameters and their values or `quit` to abort the
@@ -92,120 +91,115 @@ run.
 
 Input parameters
 ----------------
-fs       final state (ee/gg/mm/pp/pi/mr/pr)
+fs		final state (ee/gg/mm/pp/pi/mr/pr)
 		ee: e⁺e⁻ → e⁺e⁻
 		mm: e⁺e⁻ → μ⁺μ⁻
 		gg: e⁺e⁻ → γγ
 		pp: e⁺e⁻ → π⁺π⁻
 		pi: e⁺e⁻ → π⁺π⁻ (ONLY ISR CORRECTION)
 		mr: e⁺e⁻ → π⁺π⁻γ
-		pr: e⁺e⁻ → μ⁺μ⁻γ	
-	
-ecms     center of mass energy, in GeV
-thmin    minimum scattering angle for leptons (pions) in the final state,
-         in degrees
-thmax    maximum scattering angle for leptons (pions) in the final state,
-         in degrees
-thgmin   minimum scattering angle for the signal photon, 
-         in degrees
-thgmax   maximum scattering angle for for the signal photon,
-         in degrees
-zmax     maximum acollinearity angle between finale state leptons/photons,
-         in degrees
-emin     minimum energy for leptons in the final state, in GeV
+		pr: e⁺e⁻ → μ⁺μ⁻γ
 
-egmin    minimum energy for the signal photon, in GeV
+ecms	center of mass energy, in GeV
 
-massmin  minimum invariant mass of the l+l- system, in GeV
+thmin	minimum scattering angle for leptons (pions) in the final state, in degrees
 
-massmax  maximum invariant mass of the l+l- system, in GeV
+thmax	maximum scattering angle for leptons (pions) in the final state, in degrees
 
-nev      number of events to be generated
-path     directory where to store output files. In *nix systems, the
-         directory is automatically created.
+thgmin	minimum scattering angle for the signal photon, in degrees
 
-saveevents   if saving an ascii file where weighted or unweighted (according to 'mode') events are save
-             The file is 'path'/events.dat
+thgmax	maximum scattering angle for for the signal photon, in degrees
+
+zmax	maximum acollinearity angle between finale state leptons/photons, in degrees
+
+emin	minimum energy for leptons in the final state, in GeV
+
+egmin	minimum energy for the signal photon, in GeV
+
+massmin	minimum invariant mass of the l+l- system, in GeV
+
+massmax	maximum invariant mass of the l+l- system, in GeV
+
+nev		number of events to be generated
+
+path	directory where to store output files. In *nix systems, the directory is automatically created.
+
+saveevents	if saving an ascii file where weighted or unweighted (according to 'mode') events are save. The file is 'path'/events.dat.
 
 For radiative π⁺π⁻γ
-iffpi   	 1  -> Pion form factor on
-		 0  -> Pion form factor off
+iffpi	1  -> Pion form factor on
+		0  -> Pion form factor off
 For π⁺π⁻ production
-iffpi            1  -> Pion form factor F X sQED
-		 2  -> Pion form factor	GVMD
-		 3  -> Pion form factor	FsQED
-                 0  -> Pion form factor off
+iffpi	1  -> Pion form factor F X sQED
+		2  -> Pion form factor	GVMD
+		3  -> Pion form factor	FsQED
+		0  -> Pion form factor off
 
-what_ffpi to set which parametrization of the pion form factor must be used.
+what_ffpi	to set which parametrization of the pion form factor must be used.
 
-arun     off 	  -> alpha running off
-	 on/hadr5 -> hadr5n16 routine
-	 hmnt 	  -> hmnt routine
-	 nsk      -> Novosibirsk parameterization by Fedor Ignatov
-mode     it sets if the requested number of events (nev) are weighted or
-         unweighted
-eps      it sets the soft/hard photon energy separator, in ecms/2 units.
-         Results are completely independent from its choice (provided it
-         is small)
-ord      it sets which photonic radiative corrections are included:
-         'born' means Born cross section, 'alpha' means cross section at order
-         alpha and 'exp' is the best, exponentiated cross section
+arun	off			-> alpha running off
+		on/hadr5	-> hadr5n16 routine
+		hmnt		-> hmnt routine
+		nsk			-> Novosibirsk parameterization by Fedor Ignatov
+mode	it sets if the requested number of events (nev) are weighted or unweighted
+
+eps		it sets the soft/hard photon energy separator, in ecms/2 units.
+		Results are completely independent from its choice (provided it is small)
+
+ord		it sets which photonic radiative corrections are included:
+		'born' means Born cross section,
+		'alpha' means cross section at order alpha
+		'exp' is the best, exponentiated cross section
 	 
-model    it sets the model for radiative corrections. 'matched' is the
-         best one and 'ps' is very similar to older BabaYaga releases, also 
-         in this case the 'ps' is active only for non radiative process.
+model	it sets the model for radiative corrections.
+		'matched' is the best one
+		'ps' is very similar to older BabaYaga releases, also in this case the 'ps' is active only for non radiative process.
 	 
-seed     an integer number to initialize the random number generator
+seed	an integer number to initialize the random number generator
 
-nphot    only a fixed number of nphot (hard) photons are generated. A
-         negative value means all possible photons
+nphot	only a fixed number of nphot (hard) photons are generated. A negative value means all possible photons
 
-nwrite   output files in 'path' are written every nwrite events, if nwrite
-	 is set to a negative value, output is written approximately every
-	 (-nwrite) seconds
+nwrite	output files in 'path' are written every nwrite events, if nwrite is set to a negative value, output is written approximately every (-nwrite) seconds
 
-nsearch  nsearch events are generated to find the maximum value of the cross
-         section, after which also events unweightening is started.
+nsearch	nsearch events are generated to find the maximum value of the cross section, after which also events unweightening is started.
 
-verbose  it toggles some verbose output, only for debugging
+verbose	it toggles some verbose output, only for debugging
 
-sdmax    the starting maximum value for the cross section
-
+sdmax	the starting maximum value for the cross section
 
 User modifiable routines
 ------------------------
 The subroutines the user may need to modify are:
 -> 'cuts' (in the file cuts.f), used to impose event selection
-   criteria on the generated events. Cuts are always performed
-   in the lab reference frame.
+	criteria on the generated events. Cuts are always performed
+	in the lab reference frame.
+
 -> 'initstorage' (in the file routines.f): it initializes the environment
-   to store unweighted/weighted events in the events.dat file 
+	to store unweighted/weighted events in the events.dat file.
+
 -> 'eventstorage' (in the file storage.F): it stores the
-   unweighted/weighted events in the event file. By default, it saves the
-   four-moment of the final state l+,l-, and the emitted photons.
-   Any other event variable can be of course saved.
+	unweighted/weighted events in the event file. By default, it saves the
+	four-moment of the final state l+,l-, and the emitted photons.
+	Any other event variable can be of course saved.
 
 Output files
 ------------
 The output files are saved in the 'path' directory. The files are
--> events.dat: it is the file where unweighted/weighted events are stored,
-   if 'saveevents' is set to 'yes'
--> statistics.txt: it is the file (dumped every 'nwrite' points) where cross
-   sections, statistics information, input parameters, etc. are printed.
-   After the input parameters entered by the user, the weighted integrated
-   cross section is printed. It is subdivided by photon multiplicity: the
-   single cross sections depend on the 'eps' parameter but the sum does not.
-   After weighted cross section information, the unweighted events statistics
-   is reported. The user must pay attention to the "biases" cross sections:
-   they account for the biases due to negative weights events (highly
-   improbable, we never saw them) and unweightening failure due to an
-   under-estimated maximum of the differential cross section. The latter bias
-   is usually negligible, its size is estimated by the corresponding cross
-   section
--> distribution files: in these files some differential distribution,
-   calculated with weighted events, are written. The file names should be
-   self-explaining and the data are in the form (e.g. to be plot easily with
-   gnuplot) lower bin edge - differential cross section - corresponding error
+-> events.dat: it is the file where unweighted/weighted events are stored, if 'saveevents' is set to 'yes'.
+
+->	statistics.txt: it is the file (dumped every 'nwrite' points) where cross sections, statistics information,
+	input parameters, etc. are printed. After the input parameters entered by the user, the weighted
+	integrated cross section is printed. It is subdivided by photon multiplicity: the single cross sections
+	depend on the 'eps' parameter but the sum does not. After weighted cross section information, the
+	unweighted events statistics is reported. The user must pay attention to the "biases" cross sections:
+	they account for the biases due to negative weights events (highly improbable, we never saw them) and
+	unweightening failure due to an under-estimated maximum of the differential cross section. The
+	latter bias is usually negligible, its size is estimated by the corresponding cross section.
+
+->	distribution files: in these files some differential distribution,
+	calculated with weighted events, are written. The file names should be self-explaining and the data
+	are in the form (e.g. to be plot easily with gnuplot)
+	lower bin edge - differential cross section - corresponding error
    
 Input card and default cuts
 ---------------------------

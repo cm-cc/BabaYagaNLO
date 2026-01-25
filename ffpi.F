@@ -1154,7 +1154,6 @@
 
       bw_gs = (m_n**2 + d_n*m_n*g_n) / (m_n**2 - q2 + f_n - i*m_n*g_n_q)
 
-
       return
       end
 

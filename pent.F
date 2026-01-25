@@ -1,7 +1,7 @@
       subroutine setwarningLT
 #ifdef LOOPTOOLS
 #include "looptools.h"
-      call setwarndigits(30)
+      call setwarndigits(40) 
 #endif
       return
       end

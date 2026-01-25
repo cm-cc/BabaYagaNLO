@@ -50,7 +50,7 @@
 ! Variables for the output file output.rcl
 !---------------------------------------------------------------------
 
-  integer       :: RecolaScreen = 0
+  integer       :: RecolaScreen = 1
 
   character(999) :: outputfile = 'output.rcl'
   integer        :: nx = 934758

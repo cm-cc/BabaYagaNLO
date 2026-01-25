@@ -8688,7 +8688,6 @@ c            cts=2.d0*dphi/16.d0/pi/pi*alpha*4.d0*pi
 
             refi=MC_PV(repoledisp,
      .           s,t,u,0d0,spmin,spmax,xi)
-
             refi=-2.d0/pi*refi
 
             redd=MC_2D(redispdisp,s,t,u,spmin,
@@ -8701,7 +8700,6 @@ c            cts=2.d0*dphi/16.d0/pi/pi*alpha*4.d0*pi
 
             reboxpp=repp
             reboxpd=refi+reir+resd
-
             reboxdd = redd
 
 ****************** F P U the real part checked with Fulvio. 02.04.24 ********
@@ -9133,7 +9131,6 @@ c      endif
       boxpd=boxpd_t+boxpd_u
       boxpd=boxpd*aimag(ff)
       repoledisp=boxpd/x2
-
       return
       end
 

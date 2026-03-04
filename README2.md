@@ -66,7 +66,7 @@ Please notice that to change the subset to be considered, you have to run `make`
 
 In the case of the $\pi^+\pi^-$ channel, the form factor is introduced within three
 different approaches:
-- $\text{F}\times\text{sQED}$
+- F$\times$sQED
 - GVMD
 - FsQED
 

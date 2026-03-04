@@ -56,9 +56,9 @@ between gauge-invariant subset of corrections:
 
 This can be done by tuning the parameter ifisrfsr in the file `userinterface.F` with 
 the following convention:
-- `10` $\to$ ISR
-- `01` $\to$ FSR
-- `11` $\to$ FULL
+- `10` &rarr; ISR
+- `01` &rarr; FSR
+- `11` &rarr; FULL
 
 Please notice that to change the subset to be considered, you have to run `make` again.
 
@@ -95,86 +95,86 @@ run.
 ## Input parameters
 
 - `fs`		final state (ee/gg/mm/pp/pi/mr/pr)
-	- `ee` $\Rightarrow$ $e^+e^-\to e^+e^-$.
-	- `mm` $\Rightarrow$ $e^+e^-\to \mu^+\mu^-$.
-	- `gg` $\Rightarrow$ $e^+e^-\to \gamma\gamma$.
-	- `pp` $\Rightarrow$ $e^+e^-\to \pi^+\pi^-$.
-	- `pi` $\Rightarrow$ $e^+e^-\to \pi^+\pi^-$ (ONLY ISR CORRECTION).
-	- `mr` $\Rightarrow$ $e^+e^-\to \mu^+\mu^-\gamma$.
-	- `pr` $\Rightarrow$ $e^+e^-\to \pi^+\pi^-\gamma$.
+	- `ee` &rarr; $e^+e^-\to e^+e^-$.
+	- `mm` &rarr; $e^+e^-\to \mu^+\mu^-$.
+	- `gg` &rarr; $e^+e^-\to \gamma\gamma$.
+	- `pp` &rarr; $e^+e^-\to \pi^+\pi^-$.
+	- `pi` &rarr; $e^+e^-\to \pi^+\pi^-$ (ONLY ISR CORRECTION).
+	- `mr` &rarr; $e^+e^-\to \mu^+\mu^-\gamma$.
+	- `pr` &rarr; $e^+e^-\to \pi^+\pi^-\gamma$.
 
 
-- `ecms` $\Rightarrow$ center of mass energy, in GeV
+- `ecms` &rarr; center of mass energy, in GeV
 
-- `thmin` $\Rightarrow$ minimum scattering angle for leptons (pions) in the final state, in degrees
+- `thmin` &rarr; minimum scattering angle for leptons (pions) in the final state, in degrees
 
-- `thmax` $\Rightarrow$ maximum scattering angle for leptons (pions) in the final state, in degrees
+- `thmax` &rarr; maximum scattering angle for leptons (pions) in the final state, in degrees
 
-- `thgmin` $\Rightarrow$ minimum scattering angle for the signal photon, in degrees
+- `thgmin` &rarr; minimum scattering angle for the signal photon, in degrees
 
-- `thgmax` $\Rightarrow$ maximum scattering angle for for the signal photon, in degrees
+- `thgmax` &rarr; maximum scattering angle for for the signal photon, in degrees
 
-- `zmax` $\Rightarrow$ maximum acollinearity angle between finale state leptons/photons, in degrees
+- `zmax` &rarr; maximum acollinearity angle between finale state leptons/photons, in degrees
 
-- `emin` $\Rightarrow$ minimum energy for leptons in the final state, in GeV
+- `emin` &rarr; minimum energy for leptons in the final state, in GeV
 
-- `egmin` $\Rightarrow$ minimum energy for the signal photon, in GeV
+- `egmin` &rarr; minimum energy for the signal photon, in GeV
 
-- `massmin` $\Rightarrow$ minimum invariant mass of the $l^+l^-$ system, in GeV
+- `massmin` &rarr; minimum invariant mass of the $l^+l^-$ system, in GeV
 
-- `massmax` $\Rightarrow$ maximum invariant mass of the $l^+l^-$ system, in GeV
+- `massmax` &rarr; maximum invariant mass of the $l^+l^-$ system, in GeV
 
-- `nev` $\Rightarrow$ number of events to be generated
+- `nev` &rarr; number of events to be generated
 
-- `path` $\Rightarrow$ directory where to store output files. In *nix systems, the directory is automatically created.
+- `path` &rarr; directory where to store output files. In *nix systems, the directory is automatically created.
 
-- `saveevents` $\Rightarrow$ if saving an ascii file where weighted or unweighted (according to `mode`) events are save. The file is `path/events.dat`.
+- `saveevents` &rarr; if saving an ascii file where weighted or unweighted (according to `mode`) events are save. The file is `path/events.dat`.
 
-- `iffpi` $\Rightarrow$ the way $F_\pi(q^2)$ is introduced in the calculation:
+- `iffpi` &rarr; the way $F_\pi(q^2)$ is introduced in the calculation:
 	- For radiative $\pi^+\pi^-\gamma$
- 		- `0` $\Rightarrow$ Pion form factor off
-		- `1` $\Rightarrow$ Pion form factor $\text{F}\times\text{sQED}$
+ 		- `0` &rarr; Pion form factor off
+		- `1` &rarr; Pion form factor $\text{F}\times\text{sQED}$
 
 	- For $\pi^+\pi^-$ production
-		- `0` $\Rightarrow$ Pion form factor off
-		- `1` $\Rightarrow$ Pion form factor $\text{F}\times\text{sQED}$
-		- `2` $\Rightarrow$ Pion form factor GVMD
-		- `3` $\Rightarrow$ Pion form factor FsQED
+		- `0` &rarr; Pion form factor off
+		- `1` &rarr; Pion form factor $\text{F}\times\text{sQED}$
+		- `2` &rarr; Pion form factor GVMD
+		- `3` &rarr; Pion form factor FsQED
 
-- `what_ffpi` $\Rightarrow$ to set which parametrization of the pion form factor must be used.
+- `what_ffpi` &rarr; to set which parametrization of the pion form factor must be used.
 
-- `arun`	  $\Rightarrow$ sets $\alpha(s)$ routine:
- 	- `off`   $\Rightarrow$ alpha running off
-	- `nsk`   $\Rightarrow$ $\textrm{NSK}$ parameterization by Fedor Ignatov
-	- `hadr5` $\Rightarrow$ $\textrm{HADR5N16}$ routine
-	- `hmnt`  $\Rightarrow$ $\textrm{HMNT}$ routine
+- `arun`	  &rarr; sets $\alpha(s)$ routine:
+ 	- `off`   &rarr; alpha running off
+	- `nsk`   &rarr; $\textrm{NSK}$ parameterization by Fedor Ignatov
+	- `hadr5` &rarr; $\textrm{HADR5N16}$ routine
+	- `hmnt`  &rarr; $\textrm{HMNT}$ routine
 
 
-- `mode` $\Rightarrow$ sets if the requested number of events (nev) are weighted or unweighted
+- `mode` &rarr; sets if the requested number of events (nev) are weighted or unweighted
 
-- `eps` $\Rightarrow$ sets the soft/hard photon energy separator, in ecms/2 units.
+- `eps` &rarr; sets the soft/hard photon energy separator, in ecms/2 units.
 		Results are completely independent from its choice (provided it is small)
 
-- `ord` $\Rightarrow$ it sets which photonic radiative corrections are included:
+- `ord` &rarr; it sets which photonic radiative corrections are included:
 	- `born` means Born cross section,
 	- `alpha` means cross section at order alpha
 	- `exp` is the best, exponentiated cross section
 	 
-- `model` $\Rightarrow$ it sets the model for radiative corrections.
+- `model` &rarr; it sets the model for radiative corrections.
 	- `matched` is the best one
 	- `ps` is very similar to older `BabaYaga@NLO` releases, also in this case the ps is active only for non radiative process.
 	 
-- `seed` $\Rightarrow$ an integer number to initialize the random number generator
+- `seed` &rarr; an integer number to initialize the random number generator
 
-- `nphot` $\Rightarrow$ only a fixed number of `nphot` (hard) photons are generated. A negative value means all possible photons
+- `nphot` &rarr; only a fixed number of `nphot` (hard) photons are generated. A negative value means all possible photons
 
-- `nwrite` $\Rightarrow$ output files in `path` are written every `nwrite` events, if `nwrite` is set to a negative value, output is written approximately every `-nwrite` seconds
+- `nwrite` &rarr; output files in `path` are written every `nwrite` events, if `nwrite` is set to a negative value, output is written approximately every `-nwrite` seconds
 
-- `nsearch` $\Rightarrow$	nsearch events are generated to find the maximum value of the cross section, after which also events unweightening is started.
+- `nsearch` &rarr;	nsearch events are generated to find the maximum value of the cross section, after which also events unweightening is started.
 
-- `verbose` $\Rightarrow$ it toggles some verbose output, only for debugging
+- `verbose` &rarr; it toggles some verbose output, only for debugging
 
-- `sdmax` $\Rightarrow$ the starting maximum value for the cross section
+- `sdmax` &rarr; the starting maximum value for the cross section
 
 ## User modifiable routines
  
@@ -207,7 +207,7 @@ The output files are saved in the `path` directory. The files are
 
 -	distribution files: in these files some differential distribution,
 	calculated with weighted events, are written. The file names should be self-explaining and the data
-	are in the form (e.g. to be plot easily with gnuplot)
+	are in the form (e.g. to be plot easily with `gnuplot`)
 	lower bin edge - differential cross section - corresponding error
   
  
@@ -217,4 +217,4 @@ exp for the radiative process $\mu^+\mu^-\gamma$ is provided.
 
 The authors
 
-        Andrea, Carlo, Ettore, Francesco, Fulvio, Guido, Marco, Mauro, Oreste
+Andrea, Carlo, Ettore, Francesco, Fulvio, Guido, Marco, Mauro, Oreste

@@ -28,22 +28,14 @@ In $\textrm{BabaYaga@NLO}$, we make use of the following external programs:
 - [`LoopTools`](https://feynarts.de/looptools/)
 - [`RANLUX`](https://luscher.web.cern.ch/luscher/ranlux/) (C version)
 
-## Vacuum polarization choice
+## Hadronic Vacuum Polarization choice
 
-In `BabaYaga@NLO`, the hadronic contribution to the vacuum polarization
-can be calculated by means of three different routines:
--  `NSK` (default), Novosibirsk parameterization by Fedor Ignatov
-   (http://cmd.inp.nsk.su/~ignatov/vpl/)
-
-- `HADR5N16`, by F. Jegerlehner
-   (http://www-com.physik.hu-berlin.de/~fjeger/)
-
-- `HMNT`, by K. Hagiwara, A.D. Martin, D. Nomura and T. Teubner
-   (see: Phys. Rev. D, 2004, 69:093003; Phys. Lett. B, 2007, 649:173).
-
-You can choose it in the interactive menu. Please notice that
-the `HMNT` and `HADR5N16` routines, as implemented here, are not reliable on top of the narrow resonances,
-where the only reliable is `NSK`.
+The hadronic contribution to the vacuum polarization can be calculated by means of three different routines:
+1.  `NSK` (default), [Novosibirsk parameterization](http://cmd.inp.nsk.su/~ignatov/vpl/) by Fedor Ignatov
+2. `HADR5N16`, [routine](http://www-com.physik.hu-berlin.de/~fjeger/) by F. Jegerlehner 
+3. `HMNT`, routine by K. Hagiwara, A.D. Martin, D. Nomura and T. Teubner
+   
+You can choose it in the interactive menu. Please notice that the `HADR5N16` and `HMNT`routines are legacy implementations and not reliable close to narrow resonances, where the only reliable is `NSK`. If needed, `HADR5N16` and `HMNT` could be replaced with newer versions upon request to the authors.
 
 ## Radiative channels
 
@@ -53,7 +45,7 @@ between gauge-invariant subset of corrections:
 - FSR corrections (Pure FSR at tree level and NLO-FSR corrections)
 - FULL corrections
 
-This can be done by tuning the parameter ifisrfsr in the file `userinterface.F` with 
+This can be done by tuning the parameter `ifisrfsr` in the file `userinterface.F` with 
 the following convention:
 - `10` &rarr; ISR
 - `01` &rarr; FSR
@@ -98,10 +90,9 @@ run.
 	- `mm` &rarr; $e^+e^-\to \mu^+\mu^-$.
 	- `gg` &rarr; $e^+e^-\to \gamma\gamma$.
 	- `pp` &rarr; $e^+e^-\to \pi^+\pi^-$.
-	- `pi` &rarr; $e^+e^-\to \pi^+\pi^-$ (ONLY ISR CORRECTION).
+	- `pi` &rarr; $e^+e^-\to \pi^+\pi^-$ (only ISR corrections).
 	- `mr` &rarr; $e^+e^-\to \mu^+\mu^-\gamma$.
 	- `pr` &rarr; $e^+e^-\to \pi^+\pi^-\gamma$.
-
 
 - `ecms` &rarr; center of mass energy, in GeV
 
@@ -148,7 +139,6 @@ run.
 	- `hadr5` &rarr; `HADR5N16` routine
 	- `hmnt`  &rarr; `HMNT` routine
 
-
 - `mode` &rarr; sets if the requested number of events (nev) are weighted or unweighted
 
 - `eps` &rarr; sets the soft/hard photon energy separator, in ecms/2 units.
@@ -187,7 +177,7 @@ The subroutines the user may need to modify are:
 
 - `eventstorage` (in the file `storage.F`): it stores the
 	unweighted/weighted events in the event file. By default, it saves the
-	four-moment of the final state $l^+,l^-$, and the emitted photons.
+	four-moment of the final state $\ell^+,\ell^-$, and the emitted photons.
 	Any other event variable can be of course saved.
 
 ## Output files

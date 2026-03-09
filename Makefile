@@ -133,7 +133,7 @@ pack: # use only to release BABAYAGA
 clean:
 	rm -f $(OBJECTS) *.o *.a
 deepclean:
-	rm -rf $(OBJECTS) *.o *.a *.so $(EXE) $(EXE)full *~ form/*~ $(LTDIR)/lib64/ $(LTDIR)/bin/ $(LTDIR)/build/ $(LTDIR)/makefile $(LTDIR)/include/ $(LTDIR)/build$(QUAD)/ $(CLLDIR)/build/ $(CLLDIR)/modules/* $(CLLDIR)/include/ $(CLLDIR)/collierC*.cmake $(CLLDIR)/lib/ $(CLLDIR)/lib/libcollier.a $(RCLDIR)/lib/librecola.a $(RCLDIR)/build/
+	rm -rf $(OBJECTS) *.o *.a *.so $(EXE) $(EXE)full *~ form/*~ $(LTDIR)/lib64/ $(LTDIR)/bin/ $(LTDIR)/build/ $(LTDIR)/makefile $(LTDIR)/include/ $(LTDIR)/build$(QUAD)/ $(CLLDIR)/build/ $(CLLDIR)/modules/* $(CLLDIR)/include/ $(CLLDIR)/collierC*.cmake $(CLLDIR)/lib/ $(CLLDIR)/lib/libcollier.a $(RCLDIR)/lib/ $(RCLDIR)/build/ $(CLLDIR)/libcollier.a $(RCLDIR)/librecola.a
 
 # C version of ranlux by Martin Luscher
 # http://luscher.web.cern.ch/luscher/ranlux/index.html
@@ -150,15 +150,15 @@ ranlux_common.o: c_ranlux/ranlux_common.c $(EXTRADEPS) Makefile
 # source files
 main.o: main.F commonmain.F $(EXTRADEPS) Makefile
 	$(F77) -c main.F
-gen_events.o: gen_events.F commonmain.F $(EXTRADEPS) $(CLLDIR)/lib/libcollier.a
+gen_events.o: gen_events.F commonmain.F $(EXTRADEPS) collier
 	$(F77) -c $(COLLIER) $(CLLMOD) gen_events.F
-initcloseby.o: initcloseby.F commonmain.F $(EXTRADEPS) $(CLLDIR)/lib/libcollier.a
+initcloseby.o: initcloseby.F commonmain.F $(EXTRADEPS) collier
 	$(F77) -c $(COLLIER) $(CLLMOD) initcloseby.F
 cuts.o: cuts.F $(EXTRADEPS) strong2020common.F
 	$(F77) $(DEXP) -c cuts.F
 matrix_model.o: matrix_model.F  form/formme.F form/ee3gexact.F form/borngg.F form/formmemm.F pipirad/hard/*.F $(EXTRADEPS)
 	$(F77) -c matrix_model.F
-sv.o: sv.F $(EXTRADEPS) Makefile $(CLLDIR)/lib/libcollier.a
+sv.o: sv.F $(EXTRADEPS) Makefile  collier
 	$(F77) -c $(COLLIER) $(CLLMOD) $(QUADTYPE) sv.F
 2loop.o: 2loop.F $(EXTRADEPS)
 	$(F77) -c 2loop.F
@@ -194,7 +194,7 @@ mapmomenta.o: mapmomenta.F $(EXTRADEPS)
 	$(F77) -c mapmomenta.F
 sampling.o: sampling.F $(EXTRADEPS) strong2020common.F
 	$(F77) -c $(DEXP) sampling.F
-loops.o: loops.F $(EXTRADEPS) $(CLLDIR)/lib/libcollier.a
+loops.o: loops.F $(EXTRADEPS) collier
 	$(F77) -c $(COLLIER) $(CLLMOD) $(QUADTYPE) loops.F
 routines.o: routines.F $(EXTRADEPS) collier
 	$(F77) $(COLLIER) $(CLLMOD) -c routines.F
@@ -202,11 +202,11 @@ distributions.o: distributions.F shared.F $(EXTRADEPS) Makefile strong2020common
 	$(F77) $(DEXP) -c distributions.F
 #ranlux.o: ranlux.F $(EXTRADEPS)
 #	$(F77) -c ranlux.F
-recola_int.o: recola_int.F $(EXTRADEPS) Makefile
+recola_int.o: recola_int.F $(EXTRADEPS) Makefile $(RCLDIR)/lib/librecola.a
 	$(F77) $(RECOLA) $(RCLMOD) -c recola_int.F	
 hard_ampl.o: hard_ampl.F $(EXTRADEPS)
 	$(F77) -c hard_ampl.F
-pent.o: pent.F $(EXTRADEPS)
+pent.o: pent.F $(EXTRADEPS) $(LTDIR)/lib64/libooptools$(QUAD).a
 	$(F77) -c $(LT) $(LTINC) $(QUADTYPE) pent.F
 
 # lightweight ALPHA version, by Mauro Moretti
@@ -228,7 +228,7 @@ $(CLLDIR)/lib/libcollier.a:
 	cd $(CLLDIR)/build/ && cmake -Dstatic=On .. -DCMAKE_INSTALL_PREFIX=..  && make && make install
 
 recola: $(RCLDIR)/lib/librecola.a collier
-$(RCLDIR)/lib/librecola.a:
+$(RCLDIR)/lib/librecola.a: $(CLLDIR)/lib/libcollier.a
 	@echo "Building RECOLA"
 	@echo " "
 	mkdir -p $(RCLDIR)/build/

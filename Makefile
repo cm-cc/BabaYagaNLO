@@ -123,7 +123,7 @@ pack: # use only to release BABAYAGA
         hadr5n16.F hadr5n09.F userinterface.F intpl.F Rteubner.F strong2020common.F driver_gen_events.F\
         hadr5n17.F hadr5n12.F hadr5x23.F hard_ampl.F interface.F mtx_eeenudbb.F ffpi.F initcloseby.F\
         recola_int.F storage.F dalhadshigh17.F dalhadslow17.F dalhadt17.F dalhadthigh17.F prm.f\
-        vpol_all_bare_sum_v2.9.dat vpol_bare_lept_v2.9.dat muemuegg.F muemuegg-plus.f pent.F ALPHA.F\
+        vpol_all_bare_sum_v2.9.dat vpol_bare_lept_v2.9.dat muemuegg.F muemuegg-plus.f eeeegg-frm.f pent.F ALPHA.F\
         $(RELEASEDIR) &&\
 	cp form/*.[fF] $(RELEASEDIR)/form/ &&\
 	cp c_ranlux/* $(RELEASEDIR)/c_ranlux/ &&\
@@ -176,7 +176,7 @@ hadr5n17.o: hadr5n17.F $(EXTRADEPS)
 	$(F77) -c hadr5n17.F
 ffpi.o: ffpi.F $(EXTRADEPS)
 	$(F77) -c ffpi.F
-muemuegg.o: muemuegg.F $(EXTRADEPS)
+muemuegg.o: muemuegg.F $(EXTRADEPS) muemuegg-plus.f eeeegg-frm.f
 	$(F77) -c muemuegg.F
 hadr5x23.o: hadr5x23.F $(EXTRADEPS)
 	$(F77) -c hadr5x23.F

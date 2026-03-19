@@ -382,18 +382,18 @@ c      real*8 deltah,deltai
 **********************
 * AGGIUNTO PER I RADIATIVI
 ***********************
-         if(fs.eq.'mr'.or.fs.eq.'er'.or.fs.eq.'pr') then
-              print*, '***********************************************'
-              print*,'NON PUOI AVERE 0 FOTONI IN UN EVENTO RADIATIVO'
-              print*,' ***********************************************'
-              return
-         else
-            iref = 1
-            summt2 = bornme
-            imtx = 1
-            iarun = iarunbck
-            return
-         endif
+            if(fs.eq.'mr'.or.fs.eq.'er'.or.fs.eq.'pr') then
+               print*, '***********************************************'
+               print*,'NON PUOI AVERE 0 FOTONI IN UN EVENTO RADIATIVO'
+               print*,' ***********************************************'
+               return
+            else
+               iref = 1
+               summt2 = bornme
+               imtx = 1
+               iarun = iarunbck
+               return
+            endif
          endif
 
 c         if (ng.gt.2.and.fs.eq.'mm') then
@@ -464,6 +464,14 @@ c               stop
 !    	 print*,iarun
 
          if(ng.eq.2) then
+
+c      summt2 = 0.5d0*eeeegg(pin2,pin1,p2,p1,qph(1,:),qph(2,:))
+c      return
+c      call glueALPHA(ng,pin1,pin2,p1,p2,qph(1:ng,:),summt2a)
+c      summt2a = 0.5d0*summt2a
+c      print*,summt2,summt2a,summt2a/summt2-1.d0
+c      stop
+            
            do i=0,3
                q(i) = qph(1,i)
            enddo

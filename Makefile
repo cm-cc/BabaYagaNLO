@@ -121,7 +121,7 @@ pack: # use only to release BABAYAGA
         main.F loops.F gen_events.F commonmain.F cuts.F sv.F matrix_model.F mapmomenta.F vpol_novosibirsk.dat\
         routines.F invariants.h sampling.F phasespace.F distributions.F $(VPHLMNT).F\
         hadr5n16.F hadr5n09.F userinterface.F intpl.F Rteubner.F strong2020common.F driver_gen_events.F\
-        hadr5n17.F hadr5n12.F hadr5x23.F hard_ampl.F interface.F mtx_eeenudbb.F ffpi.F initcloseby.F\
+        hadr5n17.F hadr5n12.F hadr5x23.F hard_ampl.F interface.F ffpi.F initcloseby.F\
         recola_int.F storage.F dalhadshigh17.F dalhadslow17.F dalhadt17.F dalhadthigh17.F prm.f\
         vpol_all_bare_sum_v2.9.dat vpol_bare_lept_v2.9.dat muemuegg.F muemuegg-plus.f eeeegg-frm.f pent.F ALPHA.F\
         $(RELEASEDIR) &&\

@@ -34,7 +34,7 @@
 # Carlo's ignores
 *work*/
 LoopTools-*-clean/
-recolas/recola-*-clean/
+recolas/recola*-*-clean/
 collier/COLLIER-*-clean/
 LoopTools-*/bin/
 LoopTools-*/build*/
@@ -45,7 +45,7 @@ collier/COLLIER-*/build/
 collier/COLLIER-*/collierConfig.cmake
 collier/COLLIER-*/collierConfigVersion.cmake
 collier/COLLIER-*/lib/
-recolas/recola-*/build/
-recolas/recola-*/lib/
-recolas/recola-*/recolaConfig.cmake
-recolas/recola-*/recolaConfigVersion.cmake
+recolas/recola*-*/build/
+recolas/recola*-*/lib/
+recolas/recola*-*/recolaConfig.cmake
+recolas/recola*-*/recolaConfigVersion.cmake

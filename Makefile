@@ -45,8 +45,8 @@ ifeq ($(COLLIER),-DCOLLIER)
 endif
 
 ifeq ($(RECOLA),-DRECOLA)
-  RCLVERSION = 1.5.0
-  RCLDIR = recolas/recola-$(RCLVERSION)
+  RCLVERSION = 1.5.1
+  RCLDIR = recolas/recola1-$(RCLVERSION)
   RCLMOD = -I$(RCLDIR)/include/
   RCLLIB = -L$(RCLDIR)/lib/ -lrecola
   LIBFILES += $(RCLDIR)/lib/librecola.a
@@ -95,7 +95,7 @@ OBJECTS = gen_events.o initcloseby.o cuts.o sv.o matrix_model.o mapmomenta.o loo
           routines.o sampling.o phasespace.o distributions.o $(VPHLMNT).o\
           hadr5n16.o hadr5n09.o hadr5x23.o userinterface.o intpl.o Rteubner.o\
           hadr5n17.o hadr5n12.o c_rnlx_interface.o ranlux_common.o ranlxd.o ranlxs.o recola_int.o\
-          hard_ampl.o pent.o storage.o muemuegg.o ALPHA.o
+          hard_ampl.o pent.o storage.o muemuegg.o ALPHA.o approximations.o
 
 F77 += $(FFLAGS)
 
@@ -122,7 +122,7 @@ pack: # use only to release BABAYAGA
         routines.F invariants.h sampling.F phasespace.F distributions.F $(VPHLMNT).F\
         hadr5n16.F hadr5n09.F userinterface.F intpl.F Rteubner.F strong2020common.F driver_gen_events.F\
         hadr5n17.F hadr5n12.F hadr5x23.F hard_ampl.F interface.F ffpi.F initcloseby.F\
-        recola_int.F storage.F dalhadshigh17.F dalhadslow17.F dalhadt17.F dalhadthigh17.F prm.f\
+        recola_int.F storage.F dalhadshigh17.F dalhadslow17.F dalhadt17.F dalhadthigh17.F prm.f approximations.F\
         vpol_all_bare_sum_v2.9.dat vpol_bare_lept_v2.9.dat muemuegg.F muemuegg-plus.f eeeegg-frm.f pent.F ALPHA.F\
         $(RELEASEDIR) &&\
 	cp form/*.[fF] $(RELEASEDIR)/form/ &&\
@@ -208,6 +208,8 @@ hard_ampl.o: hard_ampl.F $(EXTRADEPS)
 	$(F77) -c hard_ampl.F
 pent.o: pent.F $(EXTRADEPS) $(LTDIR)/lib64/libooptools$(QUAD).a
 	$(F77) -c $(LT) $(LTINC) $(QUADTYPE) pent.F
+approximations.o: approximations.F $(EXTRADEPS)
+	$(F77) -c approximations.F
 
 # lightweight ALPHA version, by Mauro Moretti
 ALPHA.o: ALPHA.F prm.f

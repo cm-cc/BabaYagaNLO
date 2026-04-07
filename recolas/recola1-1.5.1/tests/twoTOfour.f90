@@ -3,11 +3,11 @@
 !!  File  twoTOfour.f90
 !!  is part of RECOLA (REcursive Computation of One Loop Amplitudes)
 !!
-!!  Copyright (C) 2015-2017   Stefano Actis, Ansgar Denner,
-!!                            Lars Hofer, Jean-Nicolas Lang,
+!!  Copyright (C) 2015-2017   Stefano Actis, Ansgar Denner, 
+!!                            Lars Hofer, Jean-Nicolas Lang, 
 !!                            Andreas Scharf, Sandro Uccirati
 !!
-!!  RECOLA is licenced under the GNU GPL version 3,
+!!  RECOLA is licenced under the GNU GPL version 3, 
 !!         see COPYING for details.
 !!
 !#####################################################################

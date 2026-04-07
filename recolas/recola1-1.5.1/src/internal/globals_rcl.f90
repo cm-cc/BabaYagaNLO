@@ -22,7 +22,7 @@
 ! Parameters
 !---------------------------------------------------------------------
 
-  character(len=9) :: version_rcl = "1.5.0"
+  character(len=9) :: version_rcl = "1.5.1"
 
   integer,     parameter :: sp = kind (10e0) ! single precision
   integer,     parameter :: dp = kind (23d0) ! double    "
@@ -50,7 +50,7 @@
 ! Variables for the output file output.rcl
 !---------------------------------------------------------------------
 
-  integer       :: RecolaScreen = 1
+  integer       :: RecolaScreen = 0
 
   character(999) :: outputfile = 'output.rcl'
   integer        :: nx = 934758

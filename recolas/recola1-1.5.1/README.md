@@ -111,7 +111,6 @@ in the recola build directory.
 
 * * *
 
-
 ## General instruction when using Recola in a Fortran/C++ program
 
 In order to use Recola its modules have to be loaded:
@@ -148,6 +147,25 @@ Note that these steps have to be followed in the order given above.  In particul
 
 * * *
 
-[1]: https://recola.gitlab.io/recola2/  "RECOLA"
+## Contributing
+
+We use a branch-based workflow with `testing` and `stable` as integration branches.
+
+### External contributors
+
+External contributors should open a merge request (MR) targeting the `testing` branch.
+
+### Internal contributors and releases
+
+Internal development and releases follow this flow:
+
+1. Work on an issue.
+2. Open an MR targeting `testing`.
+3. After validation, open an MR from `testing` to `stable`.
+4. Create the release from `stable` and publish it with a tag.
+
+* * *
+
+[1]: https://recola.gitlab.io/  "RECOLA"
 [2]: http://collier.hepforge.org/         "COLLIER""
 [3]: https://cmake.org/                   "CMake"

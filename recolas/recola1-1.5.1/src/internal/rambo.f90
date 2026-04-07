@@ -226,7 +226,7 @@
       implicit none
       integer idmy
       real RVEC(1)
-      idmy = idmy
+      ! idmy = idmy  ! causes a segfault on gfortran 15.X
       call RANLUX (RVEC,1)
       RN = DBLE(RVEC(1))
       return

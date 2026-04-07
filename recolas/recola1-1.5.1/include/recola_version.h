@@ -2,5 +2,5 @@
 #define RECOLA_VERSION_H
 #define RECOLA_MAJOR 1
 #define RECOLA_MINOR 5
-#define RECOLA_PATCH 0
+#define RECOLA_PATCH 1
 #endif

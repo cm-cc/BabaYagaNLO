@@ -1,0 +1,47 @@
+image: jnl89/recola:latest
+
+workflow:
+  rules:
+    - if: $CI_MERGE_REQUEST_ID  # Execute jobs in merge request context
+    - if: ($CI_COMMIT_BRANCH == 'testing') || ($CI_COMMIT_BRANCH == 'stable')  # Execute jobs when a new commit is pushed to testing/stable branch
+
+stages:
+  - build_stage
+  - test_stage
+  - release
+
+before_script:
+  - mkdir -p build
+
+build:
+  stage: build_stage
+  script:
+    - echo "Building"
+    - cd build
+    - wget -O collier.tar.gz 'https://collier.hepforge.org/downloads/?f=collier-1.2.9.tar.gz'
+    - tar -xf collier.tar.gz && cd COLLIER-1.2.9/build && cmake ..  && make && cd ../../
+    - cmake .. -Dcollier_path=../build/COLLIER-1.2.9 -Dwith_smtests=On && make -j && cd ..
+  artifacts:
+    untracked: true
+    paths:
+    - build
+    expire_in: 1hrs
+
+testing:
+  stage: test_stage
+  script:
+    - echo "Testing"
+    - cd build
+    - make check
+
+release_job:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG  # Run this job when a tag is created
+  script:
+    - echo "running release_job"
+  release:  # See https://docs.gitlab.com/ee/ci/yaml/#release for available properties
+    tag_name: '$CI_COMMIT_TAG'
+    name: 'Release $CI_COMMIT_TAG'
+    description: '$CI_COMMIT_TAG'

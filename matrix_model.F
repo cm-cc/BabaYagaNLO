@@ -436,7 +436,10 @@ c               call glueALPHA(ng,pin1,pin2,p1,p2,qph(1:ng,:),summt2a)
 c               print*,summt2,summt2a,summt2a/summt2-1.d0
 c               stop
 
+c               fs = fsbck
+c              call antenna_approx_ee(ng,pin1,pin2,p1,p2,qph(1,:),summt2)
 
+               
                imtx = 1
                iarun = iarunbck
                fs = fsbck
@@ -455,6 +458,10 @@ c               call glueALPHA(ng,pin1,pin2,p1,p2,qph(1:ng,:),summt2a)
 c               print*,summt2a/summt2-1.d0,summt2a,summt2
 c               stop
 
+c               fs = fsbck
+c              call antenna_approx_ee(ng,pin1,pin2,p1,p2,qph(1,:),summt2)
+c              call antenna_approx(ng,pin1,pin2,p1,p2,qph(1,:),summt2)
+               
                summt2=summt2
                imtx = 1
                fs = fsbck
@@ -1601,7 +1608,6 @@ c      vp122 = abs(vp12)**2 !* 0d0
 c      vp342 = abs(vp34)**2 !* 0.d0
       vp342 = vp34*vp34d
 
-
       if (ifisrfsr.eq.01) then
          vp34  = 0.d0
          vp34d = 0.d0
@@ -2517,7 +2523,6 @@ c     print*,' ONLY INTERFERENCE!!'
 c         smtq2 = 32.d0*(st2)
          smt   = smtq2
 
-
       elseif (fs.eq.'mm') then
          !! WARNING::: NO Z EXCHANGE IN MU MU !!!
          mm2 = ammu*ammu
@@ -2528,6 +2533,7 @@ c         smtq2 = 32.d0*(st2)
          elmat2=32.d0*e4/s2*((t2+u2)/4.d0+s*(me2+mm2)-(me2+mm2)**2/2.d0)
          smtq2 = elmat2
          smt   = smtq2
+
          return
       elseif (fs.eq.'pp'.or.fs.eq.'pi') then
          mpi2 = ampi*ampi

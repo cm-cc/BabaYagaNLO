@@ -1,3 +1,3 @@
 	integer nphmx
-	parameter (nphmx=20)
+	parameter (nphmx=10)
 

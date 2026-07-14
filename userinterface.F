@@ -756,7 +756,7 @@ c      print*,setkey(36),'--> energy spread for positron beam (GeV)'
       print*,'           (*) for pi+pi+g only options 0 and 1'
 
       print*,setkey(38),'--> which FF to use [strong2020/cmd2/cmd3/'//
-     .     'bwsum2/bwsum3/snd/babar/besiii/kloe2/phokhara/bern]'
+     .     'bwsum2/bwsum3/snd/babar/besiii/kloe2/phokhara]'
       return
       end
 c

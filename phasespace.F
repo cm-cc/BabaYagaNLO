@@ -1087,7 +1087,8 @@ c      klast = -10
 
          pmodmin  = sqrt(emin*emin - m1*m1)
          bmin     = pmodmin/emin
-         q2mincut = 2.d0*m1*m1+2.d0*emin*emin*(1.d0-bmin*bmin*cos(zmax))
+c         q2mincut = 2.d0*m1*m1+2.d0*emin*emin*(1.d0-bmin*bmin*cos(zmax)) ! bug
+         q2mincut = 2.d0*m1*m1+2.d0*emin*emin*(1.d0+bmin*bmin*cos(zmax))
          q2min    = max(q2min,q2mincut,amassainvmin)
 
          q2max = ro - eps*2.d0*Emaxgamma*alam

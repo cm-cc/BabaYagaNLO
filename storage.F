@@ -284,7 +284,7 @@ c      chtags(16) = 'q2z'
       enddo
       return
       end
-
+****
       subroutine sort_vector_inverse(v,sv,iold,n)
 ! pensare quick sort!!
       implicit double precision (a-h,o-z)
@@ -300,7 +300,7 @@ c      return
          iold(k) = k
          sv(k) = v(k)
       enddo
-      do i = 1,n
+      do i = 1,n-1
          vmin = sv(i)
          do j=i+1,n
             if (v(j).lt.vmin) then

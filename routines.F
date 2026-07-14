@@ -1193,17 +1193,52 @@ c      a2 = acos(a2)
       return
       end
 *
-      function factorial(n)
+      function factorial_OLD(n)
       integer n,nl
-      double precision factorial
+      double precision factorial_OLD
       nl = n
-      factorial = 1.d0
+      factorial_OLD = 1.d0
       do while(nl.gt.0)
-         factorial = 1.d0*nl * factorial
+         factorial_OLD = 1.d0*nl * factorial_OLD
          nl = nl - 1
       enddo
       return
       end
+************************************************
+      function factorial(n)
+      integer n,nl      
+      double precision factorial
+      double precision factarray(0:15)
+      common/factarray/factarray
+      data factarray /
+     .     1d0,             !  0
+     .     1d0,             !  1
+     .     2d0,             !  2
+     .     6d0,             !  3
+     .     24d0,            !  4
+     .     120d0,           !  5
+     .     720d0,           !  6
+     .     5040d0,          !  7
+     .     40320d0,         !  8
+     .     362880d0,        !  9
+     .     3628800d0,       ! 10
+     .     39916800d0,      ! 11
+     .     479001600d0,     ! 12
+     .     6227020800d0,    ! 13
+     .     87178291200d0,   ! 14
+     .     1307674368000d0/ ! 15
+      if (n.le.15) then
+         factorial = factarray(n)
+         return
+      endif      
+      nl = n
+      factorial = 1.d0
+      do while(nl.gt.0)
+         factorial = dble(nl) * factorial
+         nl = nl - 1
+      enddo
+      return
+      end      
 ***********
       function eikonalintegral(p1,p2,p3,p4,ch,masses)
       implicit double precision (a-h,l,m,o-z)

@@ -10,7 +10,7 @@
       !! Input: squared momentum (q2)
       !! Output: complex form factor (ff), squared form factor (ff2)
       !! Implemented parametrisations: strong2020, cmd2, cmd3, bwsum2,
-      !! bwsum3, snd, babar, besiii, kloe2, phokhara, bern
+      !! bwsum3, snd, babar, besiii, kloe2, phokhara
       subroutine ffpi(q2,ff,ff2)
 
       implicit none
@@ -57,8 +57,8 @@
             call ffpi_kloe2(q2,ff,ff2)
          elseif (what_ffpi.eq.'phokhara') then
             call ffpi_phokhara(q2,ff,ff2)
-         elseif (what_ffpi.eq.'bern') then
-            call ffpi_bern(q2,ff,ff2)
+c         elseif (what_ffpi.eq.'bern') then
+c            call ffpi_bern(q2,ff,ff2)
          else
             print*, 'Error: Invalid choice of pion form factor'
          endif
@@ -995,48 +995,6 @@
      &   / (1 + f_n(1) + f_n(2) + f_n(3))
 
 !      ff=bw_const(0.77526d0,0.1474d0,q2)
-
-      !! Squared pion form factor
-      ff2 = real(ff)**2 + aimag(ff)**2
-
-      return
-      end
-
-      !!==============================================================!!
-
-      !! Charged pion form factor from dispersion relations
-      !! Based on experimental data before CMD-3
-      !! Reference: JHEP 02 (2019) 006
-      !! Input: squared momentum (q2)
-      !! Output: squared form factor (ff2)
-      !! Energy range: 4*m_pi^2 < s < 4 GeV^2
-      subroutine ffpi_bern(q2,ff,ff2)
-
-      implicit none
-
-      double precision q2,ff2
-      double complex ff
-
-      double complex ffpi_table,ffpi_interpolate
-      character*50 input_file
-
-      integer nitems,interpol
-
-      !! Input file location
-      input_file = 'ffpi_bern_input.txt'
-
-      !! Number of items in the input table (< 2000)
-      nitems = 1000
-
-      !! Flag to activate the linear interpolation of the input table
-      interpol = 1
-
-      !! Pion form factor
-      if (interpol.eq.1) then
-         ff = ffpi_interpolate(sqrt(q2),input_file,nitems)
-      else
-         ff = ffpi_table(sqrt(q2),input_file,nitems)
-      endif
 
       !! Squared pion form factor
       ff2 = real(ff)**2 + aimag(ff)**2

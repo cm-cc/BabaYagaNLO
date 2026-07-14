@@ -213,6 +213,7 @@
          if (fs.eq.'pp') uuu = ampi
          if (fs.eq.'pi') uuu = ampi
          bmi(8) = 2.d0*max(emin,uuu)
+         bmi(8) = 2.d0*uuu
          bma(8) = ecms
 
          bmi(9)  =  bmi(4)

@@ -20,6 +20,100 @@
       q3 = 0d0
       q4 = 0d0
 
+      do k = 1,ng
+         q = qph(k,:)
+
+
+         if(q(0).le.p1(0)) then
+            en=q(0)**2.d0
+         else
+            en=p1(0)**2.d0
+         endif
+         c1=en*(1-tridot(p1,q)/dsqrt(tridot(p1,p1))/q(0))
+
+         if(q(0).le.p2(0)) then
+            en=q(0)**2.d0
+         else
+            en=p2(0)**2.d0
+         endif
+         c2=en*(1-tridot(p2,q)/dsqrt(tridot(p2,p2))/q(0))
+
+         if(q(0).le.p3(0)) then
+            en=q(0)**2.d0
+         else
+            en=p3(0)**2.d0
+         endif
+         c3=en*(1-tridot(p3,q)/dsqrt(tridot(p3,p3))/q(0))
+
+         if(q(0).le.p4(0)) then
+            en=q(0)**2.d0
+         else
+            en=p4(0)**2.d0
+         endif
+         c4=en*(1-tridot(p4,q)/dsqrt(tridot(p4,p4))/q(0))
+
+         cond=(fs.eq.'mr'.or.fs.eq.'pr')
+         if (fs.eq.'ee'.or.fs.eq.'mm'.or.fs.eq.'pp'
+     .       .or.fs.eq.'mr'.or.fs.eq.'er'.or.fs.eq.'pr') then
+            if (c1.lt.c2.and.c1.lt.c3.and.c1.lt.c4) iclose(k) = 1
+            if (c2.lt.c1.and.c2.lt.c3.and.c2.lt.c4) iclose(k) = 2
+            if (c3.lt.c2.and.c3.lt.c1.and.c3.lt.c4) iclose(k) = 3
+            if (c4.lt.c1.and.c4.lt.c2.and.c4.lt.c3) iclose(k) = 4
+         elseif (fs.eq.'gg'.or.fs.eq.'pi') then
+            if (c1.lt.c2) iclose(k) = 1
+            if (c2.lt.c1) iclose(k) = 2
+         endif
+
+         if (cond.and.ifisrfsr.eq.10) then
+            if (c1.lt.c2) iclose(k) = 1
+            if (c2.lt.c1) iclose(k) = 2
+         elseif (cond.and.ifisrfsr.eq.01) then
+            if (c3.lt.c4) iclose(k) = 3
+            if (c4.lt.c3) iclose(k) = 4
+         endif
+!!!
+ccc   iclose(k) = emission(k)
+!!!   ic = iclose(k)
+         if (ic.eq.1) then
+            q1 = q1 + q
+         endif
+         if (ic.eq.2) then
+            q2 = q2 + q
+         endif
+         if (ic.eq.3) then
+            q3 = q3 + q
+         endif
+         if (ic.eq.4) then
+            q4 = q4 + q
+         endif
+      enddo
+
+      return
+      end
+********************************************************************
+
+      subroutine closestOLD(ng,qph,p1,p2,p3,p4,q1,q2,q3,q4,iclose)
+      implicit double precision (a-h,o-z)
+      parameter (maxph = 40)
+      dimension p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
+      dimension q1(0:3),q2(0:3),q3(0:3),q4(0:3)
+      character*2 fs
+      common/finalstate/fs
+      dimension qph(maxph,0:3)
+      dimension iclose(maxph)
+      integer emission(maxph)
+      common/radpattern/nph(4)
+
+      logical cond
+      common/radoption/ifisrfsr
+      integer ifisrfsr
+      iclose = 0
+
+      q1 = 0d0
+      q2 = 0d0
+      q3 = 0d0
+      q4 = 0d0
+
 c      p1modmu = 1.d0/sqrt(tridot(p1,p1))
 c      p2modmu = 1.d0/sqrt(tridot(p2,p2))
 c      p3modmu = 1.d0/sqrt(tridot(p3,p3))

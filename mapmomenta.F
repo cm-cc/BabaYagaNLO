@@ -73,7 +73,7 @@
          endif
 !!!
 ccc   iclose(k) = emission(k)
-!!!   ic = iclose(k)
+         ic = iclose(k)
          if (ic.eq.1) then
             q1 = q1 + q
          endif

@@ -109,7 +109,7 @@ c      call use_alphaz_scheme_rcl(alpha)
 
       call use_mass_reg_soft_rcl(phmass)
       call set_delta_uv_rcl(deltauv)
-
+!      call set_print_level_squared_amplitude_rcl(2)
 ** no...      call switchoff_coupling3_rcl('e-','e+','Z')
 
       if (irecola.eq.2) then
@@ -123,7 +123,7 @@ c      call use_alphaz_scheme_rcl(alpha)
 
 
       icll = 1                  ! collier has now been initialised
-      call set_collier_mode_rcl(2)
+      call set_collier_mode_rcl(1)
 
       call set_output_file_rcl(path(1:len_trim(path))//'recola.out')
 c      call set_output_file_rcl('*')

@@ -21,6 +21,8 @@ c      character*12 c1,c2,c3
       character*2 fs
       double precision s_max
       common/smax/s_max
+      common/compotontensor/compttens
+      integer compttens
 
       double precision csi(2)
       common/realinput/anpoints,sdifmax,wnpoints,fmax
@@ -70,9 +72,29 @@ c      character*12 c1,c2,c3
       common/coulomb/icoulomb
       integer ioffhvp ,inlovp
       common/offhadrVP_nlovp/ioffhvp,inlovp
-c$$$
-c$$$ for teubner routine, 2010/05/19
-c$$$
+
+      common/indexfsrdisp/iFSRdisp
+      integer iFSRdisp
+!     Related to phi corrections for pipigamma when sqrt(s)\simeq mphi
+      common/indexphires/indexphires,indexbr,indexdres
+      integer indexphires,indexbr,indexdres
+      
+      common/doubleresparams/g_rpig,g_phirp,g_phiee,beta_wphi,
+     >     PirhoVMD,Cmod_rpi,Cpha_rpi,delta_rho
+      double precision g_rpig,g_phirp,g_phiee,beta_wphi,
+     >     PirhoVMD,Cmod_rpi,Cpha_rpi,delta_rho	
+      common/kloematparams/mpp,mp0,mkp,mk0,meta,metap,gsigpp,gsigkk,
+     >     gf0pp,gf0kk,mf0,msig,b0p,b1p,b2p,lambdap,m2kk,m0kk,lambdakk
+     >     ,cf0sigma,gphikk
+      double precision mpp,mp0,mkp,mk0,meta,metap,gsigpp,gsigkk,
+     >     gf0pp,gf0kk,mf0,msig,b0p,b1p,b2p,lambdap,m2kk,m0kk,lambdakk
+     >     ,cf0sigma,gphikk
+      double precision fv,gv,fa,fp,ma,gphig
+      common/brehmstralparams/fv,gv,fa,fp,ma,gphig
+      double precision mr,gr,mphi,gphi
+      common/resparams/mr,gr,mphi,gphi
+      
+
       integer iteubn
       common/teubner/iteubn
 c$$$
@@ -174,18 +196,20 @@ c ;-)  .     1>/dev/null 2>/dev/null &")
 
       ame  = 0.510998950d-3
 
-!      ame  = 5d-4
+!      ame  = 1d-1
 
       ammu = 105.658375d-3
 c$$$      ammu = ammu/4.d0
 
       ampi = 139.57039d-3      ! for strong2020
 
+!      ame = ampi
       alpha = 1.d0/137.03599908d0
 
-      phmass = 1d-10
+      phmass = 1d-15      
 
-
+      compttens=0
+      indexphires=0
 ** Z parameters...
       zm  = 91.153480619182744d0 !91.1876D0
       wm  = 80.357973609877547d0 !80.385d0
@@ -205,6 +229,59 @@ c$$$      ammu = ammu/4.d0
       um = sqrt(pi*alpha/sqrt2/gfermi)
 ** ...Z parameters
 
+** Parameters for e+ + e− → π+ + π− + γ Bremsstrahlung process (17)
+*                 e+ + e− → φ → (f0; f0 + σ)γ → π + π + γ φ direct decay (18)
+*                 e+ + e− → (φ; ω′) → ρπ → π + π + γ Double resonance process
+!   From PDG	
+      mr=0.77526d0              !Rho mass (GeV)
+      gr=0.1478d0               !Rho width (GeV)
+      mphi=1.019455d0           ! Omega mass (GeV)
+      gphi=4.26d-3              ! Omega width (GeV)
+      g_phiee = 1.258404d-6     ! Partial width for phi->e+e- PDG (GeV)
+      fp=92.4d-3                !Pion constant
+      gphig = sqrt(0.75d0*mphi*mphi*mphi*g_phiee/(alpha**2*Pi)) ! effective coupling of phi to gamma
+      
+      g_rpig  = 0.295d0         !Effective coupling of rho->pi gamma
+      g_phirp = 0.811d0         !Effective coupling of phi->rho pi
+      
+!!!   https://arxiv.org/pdf/hep-ph/0411113 Bremsstrahlung process 	    
+      fv=0.14d0
+      gv=0.066d0
+      fa=0.122d0
+      ma=1.23d0
+      
+!     ""Mixing angles and modules"" https://arxiv.org/pdf/0901.4440
+      beta_wphi     =   163.d0/180.d0*pi
+      PirhoVMD      =   0.645d0 
+      Cmod_rpi   = 0.062d0
+      Cpha_rpi   = 3.140d0
+      delta_rho = 31.28d0/180.d0*pi
+
+      
+*     KLOE PARAMETERISATION
+      mpp      = ampi           !pi+ mass
+      mp0      = 134.9768d-3    !pi0 mass
+      mkp      = 493.677d-3     !kp mass
+      mk0      = 497.611d-3     !k0 mass
+      meta     = 547.862d-3     !eta mass
+      metap    = 957.78d-3      !eta' mass
+      gsigpp   = -2.2d0         !effective coupling sigmapp
+      gsigkk   = -0.37d0        !effective coupling sigmakk
+      gphikk   = 4.482d0
+      gf0pp    = -1.764d0       !effective coupling f0pp
+      gf0kk    = 4.02d0         !effective coupling f0kk
+      mf0      = 0.9823d0       !f0 mass
+      msig     = 415.d-3        !sigma mass
+      b0p      = 5.4d0
+      b1p      = 3.7d0
+      b2p      = 5.00d0
+      lambdap  = 0.20d0
+      m2kk     = 0.757d0
+      m0kk     = 0.363d0
+      lambdakk = 1.24d0
+      cf0sigma = 0.015d0
+      
+*     END RADIATIVE CORRECTIONS
 ***** default input values
       fs   = 'mr' ! 'ee' or 'gg' or 'mm' or 'eg' or 'mg' !!! eg = e+e- -> e+e-g
       path = 'test-run/'
@@ -229,8 +306,9 @@ c$$$      ammu = ammu/4.d0
       thgmax = 180.d0
 
       iseed        = 10
-      iwriteout    = 1000000
+      iwriteout    = 100000
       nsearch      = 40000000
+!      nsearch      = 1000000
       iverbose     = 0
       eventlimiter = 'w'  ! 'unw' or 'w'
       store        = 'no'
@@ -268,6 +346,9 @@ c$$$      ammu = ammu/4.d0
 ******* 11 ->FULL
       ifisrfsr =  11
 
+*     option to switch off FSR dispersive corrections both to pp and pr
+      iFSRdisp = 1
+      
 *     option to switch on the pion form factor [0/1]
       icoulomb = 0
       what_ffpi = 'cmd3'
@@ -567,6 +648,9 @@ c     .'123456789*123456789*123456789*123456789'
             if (c.eq.'sprb1') esig1 = x
             if (c.eq.'sprb2') esig2 = x
             if (c.eq.'iffpi') iffpi = x
+            if (c.eq.'compttens') compttens = x
+            if (c.eq.'phidec') indexphires = x
+            if (c.eq.'iFSRdisp') iFSRdisp = x
             if (c.eq.'isQEDHO') isQEDHO = x
          endif
          if (c(1:3).eq.'run')  then
@@ -634,6 +718,11 @@ c     .'123456789*123456789*123456789*123456789'
       thgmin = thgmin * pi/180.d0
       thgmax = thgmax * pi/180.d0
       zmax  = zmax * pi/180.d0
+c     Here i take indexphires (x,y,z) and i take out three indexes ->Bremstrahlung (x), Direct radiative decay (y), double resonant decay (z)
+
+      indexbr     = indexphires/100        !x
+      indexdres   = mod(indexphires,10)    !z
+      indexphires = mod(indexphires/10,10) !y
 
 c$$$
 c$$$      if (ord.eq.'born'.or.nphotmode.eq.0) then

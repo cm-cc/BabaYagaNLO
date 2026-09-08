@@ -1,6 +1,4 @@
       integer*8 npoints,k,kbck,naccepted,iwriteout,ngrad,naccepted3
-      common/eventsaccepted_numb/npoints,k,naccepted,ngrad
-     >     ,naccepted3
       parameter (mph=40)
       real*8 csi(1)
       real*8 sumpartial(49,40),sumpartial2(49,40),xsecpartial(49,40)
@@ -10,20 +8,18 @@ c$$$      common/weightschannel/C_1g,C_2g,C_3g
 c$$$      real*8 C_1g(10),C_2g(49),C_3g(9)
       integer isr
       common/chooseisrfsr/isr
-
+      double precision numb,numb1
       common/colliermodedisp/initialisation
       integer initialisation
-      real*8 pl,sdifoutput
-      integer imax
+      real*8 pl
+      integer imax,nover,noverdelta
       dimension sump(0:mph-1),sum2p(0:mph-1)
-      common/xsecs/xsec,sump,sum2p,fractions,
-     >     xsecp,varp,var,nover,nneg,hitpmiss,hit
-      common/wrapping/sumover,sum2over,sumneg,ieb,ie,
-     >     hitneg,sum2neg,sezneg,istopsearch
       dimension fractions(0:mph-1),xi(1)
-      real*8 xsecp(0:mph-1),varp(0:mph-1)
+      dimension xsecp(0:mph-1),varp(0:mph-1)
       dimension pin(0:3),p1(0:3),p2(0:3),qph(mph,0:3),q(0:3),qcut(0:3)
       dimension qphcut(mph,0:3),q1(0:3),p01(0:3),p02(0:3),q0(0:3)
+      dimension qphtest(40,0:3)
+      integer qind,qind2
       dimension pin1(0:3),pin2(0:3),ptmp(0:3),pbeam1(0:3),pbeam2(0:3)
       dimension in_mom(0:3),qval(40,4)
       dimension pin1br(0:3),pin2br(0:3),p1br(0:3),p2br(0:3),qbr(0:3)
@@ -34,21 +30,17 @@ c$$$      real*8 C_1g(10),C_2g(49),C_3g(9)
       dimension q1bt(0:3)
       common/maptotworad/pin1bt,pin2bt,p1bt,p2bt,qbt,q1bt
       dimension p1cut(0:3),p2cut(0:3),pcm(0:3)
-      common/wrapping1/pcm
       integer isvec(104)
-      common/massesprocess/am1,am2
-      common/spinsxsec/sum2born,sumborn,sum,sumb,sumf,sum2,
-     >     xsecborn,varborn,in_conf_spin
       common/rlxstatus/isvec
       common/scaling/scaling
       complex*16 scaling
       double precision kp1,kp2,kp3,kp4
       double complex cresult
       character*6   ord
-      character*10  model,modelbck
+      character*10  model,modelbck,modelphi,modelunw
       common/channel_multi/i_ch
       integer i_ch
-      common/deltamaxrad/deltamax,deltamin
+
       character*100 outfile,storefile
       character*3   eventlimiter,eventlimitersv,store
       common/beforesort/p1o(0:3),p2o(0:3),qpho(40,0:3)
@@ -59,6 +51,14 @@ c$$$      real*8 C_1g(10),C_2g(49),C_3g(9)
       common/lt/ltint,quadevents,ilt
       integer ltint,quadevents,ilt
 
+      
+      common/gvmdchecks/iscoll,fscoll
+      integer iscoll,fscoll
+
+      common/indexphires/indexphires,indexbr,indexdres
+      integer indexphires,indexbr,indexdres
+      double precision weightpss,isrpt,fsrpt,isrphi,fsrphi,diffphi
+      double complex ifipt,ifiphi
       common/checkinvariants/lim,switchcollier
       integer switchcollier
       double precision lim
@@ -87,9 +87,8 @@ c$$$      real*8 C_1g(10),C_2g(49),C_3g(9)
       common/qedORDER/ord
       common/charinput/model,eventlimiter,store,storefile,outfile
       common/eventlsv/eventlimitersv
-      common/realinput/anpoints,sdifmax,wnpoints,fmax
+      common/realinput/anpoints,sdifmax
       common/nmaxphalpha/nphmaxalpha
-      common/maximumnumber/nphmax
 
       integer counter
       common/countercos/counter
@@ -102,10 +101,15 @@ c$$$      real*8 C_1g(10),C_2g(49),C_3g(9)
       common/nskvp/inskvp
 
       common/radoption/ifisrfsr
-      integer ifisrfsr
+      integer ifisrfsr,ifisrfsrbck
 
-      logical condps,condpsa,condfs,condexp,condnlo
-      common/condexppsrad/condps,condpsa,condfs,condexp,condnlo
+      
+      integer iffpi
+      character*10 what_ffpi
+      common/ffpioption/iffpi,what_ffpi
+
+      
+      logical condps,condpsa,condfs,condexp,condnlo,condmod
       common/idebugging/idebug
       common/regolatori/regulator1,regulator2
 *********************************************
@@ -137,16 +141,12 @@ c$$$      real*8 C_1g(10),C_2g(49),C_3g(9)
       parameter (nvps = 26)
       dimension sumv(nvps),sum2v(nvps)
       dimension xsecv(nvps),varv(nvps),diffv(nvps)
-      common/sumvvv/sumv,sum2v,xsecv,varv,
-     >     diffv
       dimension remtx(nvps)
       common/rationsvpunc/remtx,invp
 
       parameter (nvpst = 728)
       dimension sumvt(nvpst),sum2vt(nvpst)
       dimension xsecvt(nvpst),varvt(nvpst),diffvt(nvpst)
-      common/sumvvt/sumvt,sum2vt,xsecvt,
-     >     varvt,diffvt
       dimension remtxt(nvpst)
       integer ist(nvpst,6)
       common/rationsvpunct/remtxt,invpt,ist
@@ -161,9 +161,7 @@ c$$$      real*8 C_1g(10),C_2g(49),C_3g(9)
 
       logical writecond
       real starttime,endtime,truestarttime,tmptime
-      common/timecounter/starttime,endtime,truestarttime,tmptime
       integer*8 itime,itime2,kwritenow,kwritelast,idk,dit
-      common/timecounter1/itime,itime2,kwritenow,kwritelast,idk,dit
       real*16 borntrial
       integer idbgprnt
       common/printfordebug/idbgprnt
@@ -174,6 +172,7 @@ c$$$      real*8 C_1g(10),C_2g(49),C_3g(9)
       double precision tsv(20958)
       integer l
 
+      double precision medsv,medsvbef,sumsv
       common/fh/fhmax
       double precision fhmax
 

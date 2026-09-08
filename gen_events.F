@@ -113,13 +113,14 @@ ccc   call rluxut(isvec)
 *
 ** end of initial state radiation
 *******************************************
+         fsbck=fs
+         if(fs.eq.'er') then
 
+            fs='ee'
+         endif
          if (fs.ne.'gg') then
             call phasespaceCRF(pbeam1p,pbeam2p,p1,p2,qph,ng,am1,am2
      .           ,esoft,cth,w,phsp,ie)
-c$$$            call phasespace_sampled(ng,pbeam1p,pbeam2p,p1,p2,qph,
-c$$$     .     am1,am2,esoft,w,phsp,ie)
-
          else
 
             call phasespaceStrong2020(pbeam1p,pbeam2p,p1,p2,qph,ng,
@@ -128,6 +129,7 @@ c$$$     .     am1,am2,esoft,w,phsp,ie)
 
          endif
 
+         fs=fsbck
 
          ie = ie + ieb          ! ieb if beam energy spread fails
          if (ieb.gt.0) phsp = 0.d0
@@ -135,8 +137,7 @@ c$$$     .     am1,am2,esoft,w,phsp,ie)
 
          sdif = sdif * phsp * w
 
-
-         if (isnan(phsp).or.isnan(w)) then
+         if (phsp /= phsp.or. w /= w) then
             print*,' '
             print*,'NAN found (pos 1)!!! k=',k
             print*,'outfile ',outfile
@@ -144,6 +145,9 @@ c$$$     .     am1,am2,esoft,w,phsp,ie)
             print*,'end ----!!!'
             print*,'setting ie>0 and sdif to 0'
             print*,' '
+            call printstatus(1,k,p1,p2,qph,xsec,var,varbefore,sdif,
+     .           sdifmax,fmax)
+
             ie = 1
             w = 0.d0
             sdif = 0.d0
@@ -216,7 +220,6 @@ c$$$     .     am1,am2,esoft,w,phsp,ie)
          if (icut.eq.0) naccepted = naccepted + 1
          if (icut.eq.0.and.ng.ge.3) naccepted3=naccepted3+1
 
-
          irepeat = irepeat + 1
 
          iswvperr  = 0
@@ -253,23 +256,26 @@ c$$$     .     am1,am2,esoft,w,phsp,ie)
 
             modelbck=model
             if(condexp) then
-               model='psrad'
+               model=modelunw
             endif
             if(condnlo.and.k.le.nsearch) model='psrad'
             if(condnlo.and.k.gt.nsearch) model='matched'
 
+            call getrndstatus(isvec)
             call svfactor(model,ng,ecms,p1,p2,eps,sv,deltasv,q,qph)
 
-
-
-******************TO AVOID INSTABILITES
-            if(fs.eq.'mr'.or.fs.eq.'pr') then
-               if(abs(deltasv).ge.1.d-1) then
+!     To avoid instabilities
+            if(abs(deltasv).ge.2.d0) then
                  ltint=1
-                 call svfactor(model,ng,ecms,p1,p2,eps,sv,deltasv,q,qph)
+               fscoll =1
+               iscoll =1
+!     If dispersive pions we want to evaluate the same s',s'', so we reset isvec to the one before svfactor 
+               call rndreset(isvec)
+               call svfactor(model,ng,ecms,p1,p2,eps,
+     >              sv,deltasv,q,qph)
                  ltint=0
                endif
-            endif
+
 
             if((1d0+deltasv).ge.deltamax) deltamax=1.d0+deltasv
 
@@ -311,15 +317,47 @@ c$$$     .     am1,am2,esoft,w,phsp,ie)
 
          sdif=sdif*emtx
 
-         if (isnan(emtx).or.isnan(sv)) then
+c     -----------------------------    c
+c     Radiative phi decays for pr      c
+c     -----------------------------    c     
+c     This correction is  only for     c
+c             radiative pions          c
+c     -----------------------------    c
+         
+!     Occhio al reweighting, deltasv ora è relativo al solo pezzo puro sQED e approssimazioni varie nel loop
+         indexcorr = 100*indexbr+10*indexphires+indexdres
+         sdifnophi = sdif
+!         if(fs.eq.'pr'.and.indexcorr.ne.0.and.ie.eq.0) then
+         if((fs.eq.'pp'.or.fs.eq.'pr')
+     >        .and.ng.ge.1.and.indexcorr.ge.0.and.ie.eq.0) then
+            svphi = 1.d0
+!            print*,'passo'
+            if(fs.eq.'pp'.and.ord.eq.'alpha') then
+               modelphi='born'  !Il sample a 1gamma nel caso di ord=alpha per pp è un born
+            else
+               modelphi = 'psrad'
+            endif
+            call svfactor(modelphi,ng,ecms,p1,p2,eps,
+     >           svphi,deltasv,q,qph)
+            model=modelbck
+            call squared_matrix_phi(model,ng,ecms,p1,p2,pbeam1,pbeam2,
+     >       qph,ie,icalc,emtxphi,prod,deltah)
+            weightpss = wnphot*wcos*phsp * w
+            diffphi = emtxphi/in_conf_spin*convfac/flux*weightpss*svphi
+            sdif = +sdif +  diffphi
+         endif
+
+
+         if (emtx /= emtx.or. sv /= sv) then
             print*,'NaN found here. Resetting sdif to 0.'
             print*,'emtx sv w phsp cth',emtx,sv,w,phsp,cth
+            call printstatus(1,k,p1,p2,qph,xsec,var,varbefore,sdif,
+     .           sdifmax,fmax)
             sdif = 0.d0
             phsp = 0.d0
             w    = 0.d0
             ie   = 1
          endif
-
 
          if (ord.eq.'struct'.and.ie.eq.0) then
             do kk = 0,3
@@ -349,20 +387,8 @@ c$$$     .     am1,am2,esoft,w,phsp,ie)
      .              sdifmax,fmax)
             endif
          endif
-!!!!!!!!!FOR UNWEIGHTING NO PRINTING THE WEIGHTS IN THE WARM UP
-         if(k.le.nsearch.and.eventlimiter.eq.'unw') then
-            sdifoutput=0.d0
-            if(k.eq.1) then
-            print*,'Weights are set to zero (as output) in the warm up'
-            print*,'for unweighting, this will last for', nsearch,
-     >     'events'
-            endif
-         endif
-         if(eventlimiter.eq.'w') then
-            sdifoutput=sdif
-         endif
 
-!!!!! unweightinf for non radiative events and radiative at NLO
+!!!!! unweighting for (non radiative events and radiative events) at NLO
          if (k.gt.nsearch.and.(.not.condexp).and.eventlimiter.eq.'unw')
      >    then
             istopsearch = 1
@@ -374,33 +400,22 @@ c$$$     .     am1,am2,esoft,w,phsp,ie)
             endif
             hitpmiss = hitpmiss + 1.d0
             call getrnd(csi,1)
-            sdifoutput=0.d0
             if (fmax*csi(1).lt.sdif) then
-!     events with weight one
-               sdifoutput=1.d0
                hit = hit + 1.d0
-c               if (store.eq.'yes') call eventstorage(p1,p2,qph)
                if (store.eq.'yes'.and.eventlimiter.eq.'unw')
      .              call eventstorage_unweightedneg(k,+1.d0,p1cut,
      >              p2cut,qphcut)
-            else
-               sdifoutput=0.d0
             endif
 
             if (sdif.lt.-1.d-20) then
                call getrnd(csi,1)
                if (fmax*csi(1).lt.-1.d0*sdif) then
-                  sdifoutput=-1.d0
                   hitneg = hitneg + 1.d0
                   if (store.eq.'yes'.and.eventlimiter.eq.'unw') then
                      call eventstorage_unweightedneg(k,-1.d0,p1cut,
      >                    p2cut,qphcut)
-
-
                   endif
                   nneg = nneg +1.d0
-               else
-                  sdifoutput=0.d0
                endif
 
             endif
@@ -408,7 +423,6 @@ c               if (store.eq.'yes') call eventstorage(p1,p2,qph)
                nover = nover + 1
                sumover  = sumover  + sdif - fmax
                sum2over = sum2over + (sdif - fmax)**2
-
 
 
                if (iverbose.gt.0) then
@@ -421,37 +435,54 @@ c               if (store.eq.'yes') call eventstorage(p1,p2,qph)
 !     ! unweightening for unweighted events...
 !!!   HERE I INCREASE FMAX TO 1.2D0*FMAX DUE TO DE FACT THAT THE PRELIMINARY RUN IS DONE IN PSRAD
 !!!   and deltasv è al max dell'ordine di 0.2
+
+         
+*****************I PUT WEIGHTS TO ZERO IN THE PRE RUN
+         
          if (k.le.nsearch.and.condexp) then
             sdif=0.d0
          endif
-
+****************
          if (k.gt.nsearch.and.(condexp)) then
             istopsearch = 1
             if (hitpmiss.lt.1.d0) then
                fmax = 1.2d0*sdifmax
                print*,'Starting now also unweighted generation!'
             endif
-
             hitpmiss = hitpmiss + 1.d0
             call getrnd(csi,1)
-******MARCO
-            sdifoutput=0.d0
-
-            if (fmax*csi(1).lt.sdif*1.5d0) then
+!     Pre-filter to decide wether to evaluate exact SV correction
+            wfilt = 2.d0
+            if (fmax*csi(1).lt.sdif*wfilt) then
 
                sdifapprox=sdif
                eventsv=eventsv+1
                q=qph(1,:)
 
-               if(ord.eq.'exprad') then
-                 call svfactor(model,ng,ecms,p1,p2,eps,sv,deltasv,q,qph)
+               if(ord.eq.'exprad'.or.ord.eq.'exp') then
 
-                 if(abs(deltasv).ge.1.d-1) then
+                  call getrndstatus(isvec) 
+                  call svfactor(model,ng,ecms,p1,p2,
+     >                 eps,sv,deltasv,q,qph)
+
+                 
+!     To avoid instabilities
+                 if(abs(deltasv).ge.2.d0) then
                      ltint=1
-                     call svfactor(model,ng,ecms,p1,p2,eps,sv,deltasv,
-     >                    q,qph)
+                    fscoll =1
+                    iscoll =1
+!     If dispersive pions we want to evaluate the same s',s'', so we reset isvec to the one before svfactor 
+                    call rndreset(isvec)
+                    call svfactor(model,ng,ecms,p1,p2,eps,
+     >                   sv,deltasv,q,qph)
                      ltint=0
                  endif
+                 
+!!!   If phi decays active (checked that even with this correction abs(deltasv).le.0.5d0 at KLOE)
+                 if(indexcorr.ne.0) then
+                    deltasv = sdifnophi*deltasv/sdif
+                 endif
+                 
                   sdif=sdif*(1d0+deltasv)
                endif
                if (sdif.gt.sdifmax) then
@@ -461,39 +492,53 @@ c               if (store.eq.'yes') call eventstorage(p1,p2,qph)
                endif
                if((1d0+deltasv).ge.deltamax) deltamax=1d0+deltasv
                if((1d0+deltasv).le.deltamin) deltamin=1d0+deltasv
+*--------------UNWEIGHTING
 
-               if(fmax*csi(1).lt.sdif) then
-                  hit = hit + 1.d0
-                  sdifoutput=1.d0
+               if(fmax*csi(1).lt.abs(sdif)) then                                                               
 
-!               if (store.eq.'yes') call eventstorage(p1,p2,qph)
-                  if (store.eq.'yes'.and.eventlimiter.eq.'unw')
-     .                 call eventstorage_unweighted(p1cut,
-     >                 p2cut,qphcut)
-!!               print*,sdif
-!     !               print*,' '
-               else
-                  sdifpoutput=0.d0
+!     Peso (+1 o -1)
+                  weightunw = sign(1.d0, sdif)                                                                 
+                                                                                                               
+!     Peso corretto legato ai vari bias possibili introdotti
+                  thresh_filt = sdifapprox * wfilt
+                  thresh_eff  = min(thresh_filt, fmax)
+
+!     Se l'evento sfora la soglia effettiva, applichiamo la ripesatura
+                  if (abs(sdif) .ge. thresh_eff) then
+                     weightunw = sign(1.d0, sdif) * abs(sdif)
+     >                    / thresh_eff
                endif
+                  hit = hit + 1.d0*weightunw                                                                             
+                 
+c$$$                  if (icalc.eq.1.and.ie.eq.0) then
+c$$$                     call distributions(weightunw*fmax,k-nsearch,p1cut
+c$$$     >                    ,p2cut,qphcut)
+c$$$                  endif
+
+                  if (store.eq.'yes'.and.eventlimiter.eq.'unw') then
+                     call eventstorage_unweightedneg(k,weightunw,
+     >                    p1cut,p2cut,qphcut)
+                  endif
+                  
+!     1. COUNTER NEGATIVE
                if (sdif.lt.-1.d-20) then
                   nneg  = nneg  + 1
-                  sumneg  = sumneg + abs(sdif)
-                  sum2neg = sum2neg + sdif**2
-!!!!!!!PER EVENTI A PESO NEGATIVO HO IL CONTATORE, IN OUTPUT NON LI STAMPO MAI
                endif
-               if (sdif.gt.fmax) then
 
+!     2. COUNTER OVER FMAX
+                  if (abs(sdif).gt.fmax) then
                   nover = nover + 1
-                  sumover  = sumover  + sdif - fmax
-                  sum2over = sum2over + (sdif - fmax)**2
+                  endif
 
-                  if (iverbose.gt.0) then
-                     call printstatus(2,k,p1,p2,qph,xsec,var,varbefore,
-     .                    sdif,sdifmax,fmax)
+!     3. COUNTER PRE-FILTER
+                  if (abs(sdif).ge.sdifapprox*wfilt) then
+                     noverdelta   = noverdelta + 1
                   endif
 
                endif
-               corrfact=1.d0/(sdifapprox*1.5d0/fmax)
+                              
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+               corrfact=1.d0/(sdifapprox*wfilt/fmax)
                if(corrfact.ge.1.d0) then
                   sdif=sdif*corrfact
                else
@@ -502,8 +547,6 @@ c               if (store.eq.'yes') call eventstorage(p1,p2,qph)
             else
                sdif=0.d0
             endif
-
-
          endif
 
          if (isnan(sdif)) then
@@ -514,6 +557,8 @@ c               if (store.eq.'yes') call eventstorage(p1,p2,qph)
             w = 0.d0
             phsp = 0.d0
             ie = 1
+            call printstatus(1,k,p1,p2,qph,xsec,var,varbefore,sdif,
+     .           sdifmax,fmax)
             print*,'end ----!!!'
             if (iverbose.gt.0) then
                call printstatus(5,k,p1,p2,qph,xsec,var,varbefore,
@@ -525,22 +570,13 @@ c               if (store.eq.'yes') call eventstorage(p1,p2,qph)
          if (k.gt.nsearch.and.condexp) then
             k=k-nsearch
          endif
-
-
          if (idbgprnt.eq.1) then
             print*,sdif,emtx,sv,w,wnphot,wcos,phsp
          endif
 
 
-         sumpartial(i_ch,ng)=sumpartial(i_ch,ng)+sdif
-         sumpartial2(i_ch,ng)=sumpartial2(i_ch,ng)+sdif**2
-
          sum  = sum  + sdif
-         if (thav.lt.(pi/2.d0)) then
-            sumb = sumb + sdif
-         elseif (thav.gt.(pi/2.d0)) then
-            sumf = sumf + sdif
-         endif
+
          sum2 = sum2 + sdif**2
 
          if (ng.eq.0) then
@@ -563,55 +599,6 @@ c               if (store.eq.'yes') call eventstorage(p1,p2,qph)
          xsec = sum/k
          var  = sqrt(abs((sum2/k-xsec**2)/k))
 
-
-*---------------------------------------*
-*SETTING WEIGHTS FOR RADIATIVE CHANNELS
-*---------------------------------------*
-*We evaluate after nsearch/2 the optimal channel weights
-*by setting a plateaux for every channel 0.25/n_ch and
-*the remaing part is distributed as sigma_i/sum_i sigma
-*-------------------------------------------------------
-
-c$$$         if((fs.eq.'mr'.or.fs.eq.'pr').and.k.eq.nsearch/2) then
-c$$$
-c$$$            do j=1,3
-c$$$
-c$$$               if(j.eq.1) then
-c$$$                  imax=10
-c$$$               elseif(j.eq.2) then
-c$$$                  imax=49
-c$$$               else
-c$$$                  imax=9
-c$$$               endif
-c$$$               sumvar=0.d0
-c$$$               do i=1,imax
-c$$$                  xsecpartial(i,j)=sumpartial(i,j)/k
-c$$$                  varpartial(i,j)=sqrt(abs((sumpartial2(i,j)/k-
-c$$$     >                 xsecpartial(i,j)**2)/k))
-c$$$
-c$$$!                  print*,i,j, xsecpartial(i,j),varpartial(i,j)
-c$$$                  sumvar=sumvar+varpartial(i,j)
-c$$$               enddo
-c$$$
-c$$$               pl=0.25d0
-c$$$               do i=1,imax
-c$$$                  if(j.eq.1) then
-c$$$                     C_1g(i)=pl/float(imax) +varpartial(i,j)/sumvar
-c$$$     >                    *(1.d0-pl)
-c$$$
-c$$$                  elseif(j.eq.2) then
-c$$$                     C_2g(i)= pl/float(imax)+varpartial(i,j)/sumvar
-c$$$     >                    *(1.d0-pl)
-c$$$                     print*,xsecpartial(i,j),' ',varpartial(i,j)
-c$$$                  elseif(j.eq.3) then
-c$$$                     C_3g(i)= pl/float(imax)+varpartial(i,j)/sumvar
-c$$$     >                    *(1.d0-pl)
-c$$$
-c$$$                  endif
-c$$$               enddo
-c$$$            enddo
-c$$$         endif
-c$$$*-----------------------------------------------------------------------
 
 
 
@@ -683,7 +670,7 @@ c            call distributions(sdif,k,p1,p2,qph)
 
 
 **[[WRITING OUTPUT]]
-         writecond = k.eq.npoints.or.hit.eq.npoints
+         writecond = kbck.eq.npoints.or.hit.eq.npoints
          if (iwriteout.gt.0) then
             writecond = writecond.or.mod(k,iwriteout).eq.0
          else
@@ -836,9 +823,7 @@ c     >           'max invariant XX mass =',amassainvmax,' GeV'
             write(10,'(1x,A,f16.8,A,f16.8,A)')
      :           'total:   ',xsec,' +-',var,' nb'
             write(10,*)' '
-            write(10,'(1x,A,f16.8,f16.8,f16.8,f16.8)')
-     :      'total fwd/bwd: ',xsecf,xsecb,var*xsecb/xsec,var*xsecf/xsec
-                   write(10,*)' '
+            
             write(10,'(1x,A,i12,A,f20.0)')
      :           'n. ',k,' of ',wnpoints
             eff = (1.d0*naccepted)/k
@@ -860,6 +845,8 @@ c     >           'max invariant XX mass =',amassainvmax,' GeV'
             biasneghitmiss = 0.d0
             sezover        = 0.d0
             errsezover     = 0.d0
+            sezoverpref    = 0.d0
+            errsezoverpref = 0.d0
             if (hit.gt.0.d0) then
                biashit      = 1.d0*nover/hit
                biashitpmiss = 1.d0*nover/hitpmiss
@@ -868,6 +855,10 @@ c     >           'max invariant XX mass =',amassainvmax,' GeV'
                sezover    = sumover/hitpmiss
                errsezover = (sum2over/hitpmiss - sezover**2)/hitpmiss
                errsezover = sqrt(abs(errsezover))
+               sezoverpref    = sumoverpref/hitpmiss
+               errsezoverpref = (sumoverpref2/hitpmiss - sezoverpref**2)
+     >              /hitpmiss
+               errsezoverpref = sqrt(abs(errsezoverpref))
                if(condexp) then
                   sezneg    = sumneg/hitpmiss
                   errsezneg = (sum2neg/hitpmiss - sezneg**2)/hitpmiss
@@ -891,23 +882,16 @@ c     >           'max invariant XX mass =',amassainvmax,' GeV'
      :           'N. accepted events: ',naccepted
              write(10,*)' '
              write(10,'(1x,A,i12)')
-     :           'N. accepted events with n>2: ',naccepted3
-             write(10,*)' '
-             write(10,'(1x,A,i12)')
-     :           'N. events with review map: ',counterg4
-             write(10,*)' '
-             write(10,'(1x,A,i12)')
-     :            'N. events quad precision: ',quadevents
-             write(10,*)' '
-             write(10,*)' '
-            write(10,'(1x,A,i12)')
      :           'N. points with w > fmax (bias): ',nover
+             write(10,'(1x,A,i12)')
+     :           'N. points with delta > 0.5 : ',noverdelta
+             write(10,'(1x,A,i12)')
+     :           'N. points with w < 0:',nneg
+             write(10,*)' '
 
             write(10,'(1x,A,f10.7,A,f10.7,A)')
      :           'bias/hit and bias/(hit+missed):',
      :           biashit*100,' % and ',biashitpmiss*100,' %'
-            write(10,'(1x,A,i12)')
-     :           'N. points with w < 0:',nneg
             write(10,'(1x,A,f10.5,A,f10.5,A)')
      :           'biases for w < 0:   ',
      :           biasneghit*100,' % and ',biasneghitmiss*100,' %'
@@ -1018,7 +1002,6 @@ c     >           'max invariant XX mass =',amassainvmax,' GeV'
 **[[END WRITING OUTPUT]]
          if (eventlimiter.eq.'unw') wnpoints = npoints
          if (eventlimiter.eq.'unw'.and.hit.ge.npoints) continue
-
 
          k=kbck
       return

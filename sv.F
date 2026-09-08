@@ -1058,6 +1058,8 @@ c         cov = 0.d0
 
       common/radoption/ifisrfsr
       integer ifisrfsr
+      double precision P1oP0,P0ap,argtilde
+      double precision lm1,lwmtq,z2,z3,z4
 
 #ifdef LOOPTOOLS
 #include "looptools.h"
@@ -1134,7 +1136,7 @@ c$$$#endif
                   enddo
 
 *******************CHECK INVARIANTS
-                  call check_invariants(pin1,pin2,p1,p2,q)
+!                  call check_invariants(pin1,pin2,p1,p2,q)
 **************************
                   if(fs.eq.'mr') then
 
@@ -1188,11 +1190,8 @@ c$$$#endif
                              call virtual_pr(pin1,pin2,p1,p2,q,
      >                            virtual,qphmat)
 
-
-
                                   sv =(virtual/born+(1d0+1d0*rsofttot))
-
-
+!                             sv = virtual/born
                            elseif(ifisrfsr.eq.10) then
 
                               call virtualISR_pr(pin1,pin2,p1,p2,q,
@@ -1214,7 +1213,6 @@ c$$$#endif
 
                               virtual=virtual+virtual1
                               sv =(virtual/born+(1d0+1d0*rsoftFSR))
-
                            endif
 
                         endif
@@ -1234,7 +1232,6 @@ c$$$                        endif
            endif
 
         elseif(model.eq.'psrad') then
-
                aieps     = -2.d0*dlog(eps)-1.5d0+2.d0*eps-0.5d0*eps**2
                aiepsscal = -2.d0*dlog(eps)-2.d0+2.d0*eps
 
@@ -1324,7 +1321,17 @@ c$$$               endif
 
 
 ****************TRY TO TAKE THE PHOTON I CALCULATE THE VIRT CORRECTIONS ON TO BE THE HARDEST (LBK THEOREM)
-
+c$$$         if(ng.gt.3) then
+c$$$            sv=0.d0
+c$$$            deltasv=0.d0
+c$$$            return
+c$$$         endif
+c$$$
+c$$$         if(ng.eq.3) then
+c$$$            sv=1.d0
+c$$$            deltasv=0.d0
+c$$$            return
+c$$$         endif
                 ind=1
                 call getsignalphot(pin1,pin2,p1,p2,qphmat,ng,ind,j)
                 pin1cl=pin1
@@ -1353,11 +1360,6 @@ c$$$               endif
                 ind=1
                 call maptoone_rad(pin1cl,pin2cl,p1cl,p2cl,qphmat(j,:),
      >           iclose(j),ind,pin1br,pin2br,p1br,p2br,qbr)
-
-
-*********HERE TO CHECK IF SOME INVARIANTS ARE TOO SMALL (LIM PARAMETER), IF THE CASE, SWITCH COLLIER TO COLI THAT AVOIDS ERRORS
-
-                call check_invariants(pin1br,pin2br,p1br,p2br,qbr)
 
          aieps     = -2.d0*dlog(eps)-1.5d0+2.d0*eps-0.5d0*eps**2
 
@@ -1431,7 +1433,6 @@ c$$$            arg2   = 2.d0*aopi *(lcoll1*aieps +(0.5d0-eps**2/2.d0))
             arg = arg2
 
 **************
-
             if (model.ne.'psrad') then
                virtual =0.d0
                egmaxbck=egmax
@@ -1462,12 +1463,20 @@ c$$$            arg2   = 2.d0*aopi *(lcoll1*aieps +(0.5d0-eps**2/2.d0))
                     svpureoal= (virtual/born+
      >     1d0*soft_integral_muons(egmax,pin1br,pin2br,p1br,p2br))
 
-c$$$                    print*,'svpureoal',svpureoal
-c$$$                    call recola_ampl(1,pin1br,pin2br,p1br,p2br,qbr,
-c$$$     >                   brcl,svrcl, qphmat)
+!!!!  Might be interesting to add P(1)*born
+!     x is the fraction of energy retained by the electron
+!     only IS for the moment
+c$$$                    if(ng.eq.2) then
+c$$$                       x = (pin1(0) - qphmat(j,0))/pin1(0)
+c$$$                       P0ap = (1.d0 + x**2)/(1-x)
 c$$$
-c$$$                    svpureoal= (svrcl/brcl)-1d0
-c$$$                    print*,'recola',svpureoal
+c$$$                       P1oP0 = -alpha/2.d0/pi*(2.d0*log(x)*log(1.d0-x)+
+c$$$     >                      1.5d0*log(x) +((1.5d0+3.5d0*x)*log(x) +
+c$$$     >                      0.5d0*(1.d0+x)*log(x)**2 +
+c$$$     >                      5.d0*(1.d0-x))/P0ap)
+c$$$                       svpureoal = svpureoal +P1oP0
+c$$$                       
+c$$$                    endif
                  elseif(fs.eq.'er') then
                     iarunbck=iarun
                     iarun=0
@@ -1495,7 +1504,6 @@ c$$$                    print*,'recola',svpureoal
 
      		  svpureoal =(virtual/born+(1d0*rsofttot))
 
-
      		elseif(ifisrfsr.eq.10) then
 
 		  call virtualISR_pr(pin1br,pin2br,p1br,p2br,qbr,
@@ -1505,14 +1513,7 @@ c$$$                    print*,'recola',svpureoal
      >		  virtual1,qphmat)
 
                   virtual=virtual+virtual1
-
-
-
-
-
      		  svpureoal =(virtual/born+(1d0*rsoftISR))
-
-
      		elseif(ifisrfsr.eq.01) then
 
 		  call virtualFSR_pr(pin1br,pin2br,p1br,p2br,qbr,
@@ -1534,6 +1535,8 @@ c$$$                    print*,'recola',svpureoal
 
          endif
 
+!         if(j1.ne.j) print*,'arg sud',arg,svpureoal
+!         eps=eps*10000.d0
          deltasv= svpureoal + arg !!! NB
 
 *-----------------COULOMB CORRECTION AT THRESHOLD
@@ -1542,7 +1545,7 @@ c$$$                    print*,'recola',svpureoal
          beta_rel= dsqrt(1.d0-dot(p2br,p2br)/p2br1(0)**2)
          eta_c = 2d0*pi*alpha/(2d0*beta_rel/(1.d0+beta_rel**2))
 
-         if(eta_c.ge.0.1d0) then
+         if((eta_c.ge.0.1d0).and.ifisrfsr.ne.10) then
             deltasv=deltasv-eta_c
          endif
 *----------------
@@ -1584,7 +1587,6 @@ c$$$                    print*,'recola',svpureoal
                lcoll1=eikonalintegral(pin1,pin2,
      .              p1,p2,charges,masses)
                arg2   = 2.d0*aopi * lcoll1 * aieps
-
                if (fs.eq.'pr') then
                   arg2 = alpha/pi*lcoll1*(aieps+aiepsscal)
                endif
@@ -1594,7 +1596,7 @@ c$$$                    print*,'recola',svpureoal
          ffs = dexp(-arg)
 
 *------------COULOMB CORRECTION AT THRESHOLD
-         if(eta_c.ge.0.1d0) then
+         if(eta_c.ge.0.1d0.and.ifisrfsr.ne.10) then
             ffs =ffs*(1.d0+eta_c)
          endif
 *------------------
@@ -1604,11 +1606,36 @@ c$$$                    print*,'recola',svpureoal
             deltasv = 0.d0
          endif
          sv = ffs * (1.d0 + deltasv)
-c$$$
+
+!         sv = ffs * deltasv
 c$$$         if(ng.eq.1) then
-c$$$            sv=(1.d0-arg+arg**2/2.d0)*(1.d0+deltasv)-deltasv*arg**2/2.d0
+c$$$            sv=(1.d0-arg+arg**2/2.d0)*(1.d0+deltasv)-arg**2/2.d0*deltasv
+c$$$c$$$!!!   Exact NLO
+c$$$c$$$            sv = 1.d0 +deltasv -arg
+c$$$c$$$!!!   Exact NNLO by https://arxiv.org/pdf/2308.09479
+c$$$c$$$            sv = sv - arg**2/2.d0 !piece that goes as the square of the universal correction
+c$$$c$$$            sv = sv - svpureoal*arg
+c$$$c$$$            sv = sv + 2.d0*aopi*lcoll1/16.d0*(48.d0*1.202056903159594d0-
+c$$$c$$$     >           24.d0*pi**2/6.d0+3.d0)*aopi
+c$$$
+c$$$            lm1   = log(dot(pin1+pin2,pin1+pin2)/ame**2)-1.d0
+c$$$            lwmtq = -log(eps)-3.d0/4.d0
+c$$$            z2 = pi**2/6.d0
+c$$$            z3 = 1.202056903159594d0
+c$$$            z4 = pi**4/90.d0
+c$$$            sv  = aopi**2/16.d0*(-32.d0*lm1**2*lwmtq**2+
+c$$$     >           16.d0*lm1*lwmtq*(7.d0-3.d0*z2)
+c$$$     >           +(48.d0*z3-24.d0*z2+3.d0)*(lm1+1.d0)
+c$$$     >           -129.d0*z4-12.d0*z3-96.d0*z2*log(2.d0)+
+c$$$     >           128.d0*z2-215.d0/4.d0) 
+c$$$
+c$$$            sv = sv+svpureoal*aopi/4.d0*(-8.d0*lm1*lwmtq-6.d0*z2+14.d0)
+c$$$            sv = sv +svpureoal+1.d0
 c$$$         elseif(ng.eq.2) then
-c$$$            sv=(1.d0-arg)*(1.d0+deltasv)+deltasv*arg
+c$$$            sv=((1.d0-arg)*(1.d0+deltasv)+arg*deltasv)
+c$$$            stilde=dot(pin1br+pin2br,pin1br+pin2br)
+c$$$            s=dot(pin1+pin2,pin1+pin2)
+c$$$            sv = sv + aopi*1.5d0*log(stilde/s)
 c$$$         else
 c$$$            sv=1.d0
 c$$$         endif
@@ -1651,6 +1678,7 @@ c$$$               else
 c$$$                  call recola_ampl(0,pin1,pin2,p1,p2,p2,brcl,svrcl
 c$$$     .                           ,qphmat)
 c$$$                  sv=svrcl/brcl
+c$$$                  stop
 c$$$               endif
             elseif(fs.eq.'pp'.or.fs.eq.'pi') then
 	       if(iffpi.le.2) then
@@ -1814,17 +1842,11 @@ ccc   changed for no VP in virtual
                else
                   svpureoal = aintsv_new(pin1b,pin2b,p1b,p2b,eps)/sdif
      .                 -1.d0
-c$$$******************MODIFY
-c$$$                  call qedvertex_isr(pin1,pin2,p1,p2,
-c$$$     >             svpureoal)
-c$$$
-c$$$***************************MODIFY
                endif
             else
             svpureoal = -arg
             endif
             iarun = iarunbck    ! added
-
          elseif (fs.eq.'gg') then
             scale = s
             lcoll = dlog(scale*ame2mu) - 1.d0

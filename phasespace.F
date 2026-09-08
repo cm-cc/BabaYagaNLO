@@ -1127,6 +1127,7 @@ c$$$         endif
          prob_q2    = 1.d0
          sommatutto = sum(prob_q2)
          prob_q2    = prob_q2/sommatutto
+!         print*,'QMIN',q2min
 
          call sampleq2wR(q2max,q2min,ro,sqs,alam,m1,
      .        q2,wq2)
@@ -2315,7 +2316,7 @@ c         print*,an1/antot,an0/antot,an2/antot
          endif
          w = antot / fun_cos(c,'ee')
       case default
-         print*,'wrong fs in get_cos. Stopping!'
+         print*,'wrong fs in get_cos. Stopping!',fs
          stop
       end select
 

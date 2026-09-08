@@ -90,96 +90,6 @@ ccc   iclose(k) = emission(k)
 
       return
       end
-********************************************************************
-
-      subroutine closestOLD(ng,qph,p1,p2,p3,p4,q1,q2,q3,q4,iclose)
-      implicit double precision (a-h,o-z)
-      parameter (maxph = 40)
-      dimension p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
-      dimension q1(0:3),q2(0:3),q3(0:3),q4(0:3)
-      character*2 fs
-      common/finalstate/fs
-      dimension qph(maxph,0:3)
-      dimension iclose(maxph)
-      integer emission(maxph)
-      common/radpattern/nph(4)
-
-      logical cond
-      common/radoption/ifisrfsr
-      integer ifisrfsr
-      iclose = 0
-
-      q1 = 0d0
-      q2 = 0d0
-      q3 = 0d0
-      q4 = 0d0
-
-c      p1modmu = 1.d0/sqrt(tridot(p1,p1))
-c      p2modmu = 1.d0/sqrt(tridot(p2,p2))
-c      p3modmu = 1.d0/sqrt(tridot(p3,p3))
-c      p4modmu = 1.d0/sqrt(tridot(p4,p4))
-
-      do k = 1,ng
-c---
-c         if (k.le.nph(1)) emission(k) = 1
-c         if (k.gt.nph(1).and.k.le.(nph(1)+nph(2))) emission(k) = 2
-c         if (k.gt.(nph(1)+nph(2)).and.k.le.(nph(1)+nph(2)+nph(3)))
-c     .        emission(k) = 3
-c         if (k.gt.(nph(1)+nph(2)+nph(3))) emission(k) = 4
-c---
-         q = qph(k,:)
-
-c         c1 = tridot(p1,q)*p1modmu/q(0)
-c         c2 = tridot(p2,q)*p2modmu/q(0)
-c         c3 = tridot(p3,q)*p3modmu/q(0)
-c         c4 = tridot(p4,q)*p4modmu/q(0)
-
-         c1 = dot(p1,q)
-         c2 = dot(p2,q)
-         c3 = dot(p3,q)
-         c4 = dot(p4,q)
-
-
-         cond=(fs.eq.'mr'.or.fs.eq.'pr')
-         if (fs.eq.'ee'.or.fs.eq.'mm'.or.fs.eq.'pp'
-     .       .or.fs.eq.'mr'.or.fs.eq.'er'.or.fs.eq.'pr') then
-            if (c1.lt.c2.and.c1.lt.c3.and.c1.lt.c4) iclose(k) = 1
-            if (c2.lt.c1.and.c2.lt.c3.and.c2.lt.c4) iclose(k) = 2
-            if (c3.lt.c2.and.c3.lt.c1.and.c3.lt.c4) iclose(k) = 3
-            if (c4.lt.c1.and.c4.lt.c2.and.c4.lt.c3) iclose(k) = 4
-         elseif (fs.eq.'gg'.or.fs.eq.'pi') then
-            if (c1.lt.c2) iclose(k) = 1
-            if (c2.lt.c1) iclose(k) = 2
-         endif
-
-         if (cond.and.ifisrfsr.eq.10) then
-            if (c1.lt.c2) iclose(k) = 1
-            if (c2.lt.c1) iclose(k) = 2
-         elseif (cond.and.ifisrfsr.eq.01) then
-            if (c3.lt.c4) iclose(k) = 3
-            if (c4.lt.c3) iclose(k) = 4
-         endif
-
-!!!
-ccc         iclose(k) = emission(k)
-!!!
-         ic = iclose(k)
-         if (ic.eq.1) then
-            q1 = q1 + q
-         endif
-         if (ic.eq.2) then
-            q2 = q2 + q
-         endif
-         if (ic.eq.3) then
-            q3 = q3 + q
-         endif
-         if (ic.eq.4) then
-            q4 = q4 + q
-         endif
-      enddo
-
-      return
-      end
 *
       subroutine closest_BCK(ng,qph,p1,p2,p3,p4,q1,q2,q3,q4,iclose)
       implicit double precision (a-h,o-z)
@@ -1836,12 +1746,6 @@ c***********************************************************************
 		massesout6(1)=ampi
 		massesout6(2)=ampi
 	endif
-
-
-
-
-
-
 !IF QCLM IS ZERO THEN THE MAPPING ROUTINE OF MAURO WORKS PERFECTLY, ALL THE ADDITIONAL PHOTONS W.R.T. THE SIGNAL ONE ARE EXTERNAL, HENCE MUST BE CLUSTERED ON THE EXTERNAL LEGS
       if(ind.eq.1) then
          call conv_mauro(pin1cl,pin2cl,p1cl,p2cl,q,pin,pout)
@@ -1943,3 +1847,192 @@ c***********************************************************************
       return
       end
 
+      
+*----------ROUTINE TO GET MOMENTA THAT SATISFY SHELL TO 4-PLE PRECISION--------*
+      subroutine shellquad(p1,p2,p3,p4,k,p1q,p2q,p3q,p4q,kq)
+      implicit none
+      real*8  p1(0:3),p2(0:3),p3(0:3),p4(0:3),k(0:3)
+      real*16 p1q(0:3),p2q(0:3),p3q(0:3),p4q(0:3),kq(0:3)
+      double precision ame,ammu,convfac,alpha,pi,ame2,ampi2,ampi
+      real*16 mp2,me2,c1,c2,cq,phi1,phi2,phiq,modp3,modp4,modq
+      real*16 cm,cp,phim,phip,modp1,modp2
+      common/parameters/ame,ammu,convfac,alpha,pi
+      common/hparam/ampi
+      external qdot
+      real*16 qdot
+      external dot
+      real*8 dot
+      integer i
+      mp2 = (ampi*1.q0)*(ampi*1.q0)
+      me2 = (ame*1.q0)*(ame*1.q0)
+
+!      print*,dot(p1,p3)
+!!!!!!!!!!!CALCOLO IL TH E PHI DI P3 E P4
+      modp1  = 0.q0
+      do i=1,3
+         modp1=modp1+p1(i)*1.q0*p1(i)*1.q0
+      enddo
+     
+      cm     =  sign(sqrt(p1(3)*1.q0*p1(3)*1.q0/modp1),p1(3)*1.q0)
+
+      modp2  =  0.q0
+
+      do i=1,3
+         modp2=modp2+p2(i)*1.q0*p2(i)*1.q0
+      enddo
+     
+      cp     =  sign(sqrt(p2(3)*1.q0*p2(3)*1.q0/modp2),p2(3)*1.q0)
+
+      modp3  = 0.q0
+      do i=1,3
+         modp3=modp3+p3(i)*1.q0*p3(i)*1.q0
+      enddo
+
+      c1     =  sign(sqrt(p3(3)*1.q0*p3(3)*1.q0/modp3),p3(3)*1.q0)
+!     print*,'cos1',c1
+      
+      modp4  = 0.q0
+      do i=1,3
+         modp4=modp4+p4(i)*1.q0*p4(i)*1.q0
+      enddo
+
+      c2     =  sign(sqrt(p4(3)*1.q0*p4(3)*1.q0/modp4),p4(3)*1.q0)
+      
+      modq   =  k(0)*1.q0
+      cq     =  k(3)*1.q0/modq
+
+      phim   =  atan2(p1(2)*1.q0,p1(1)*1.q0)
+      phip   =  atan2(p2(2)*1.q0,p2(1)*1.q0)
+      phi1   =  atan2(p3(2)*1.q0,p3(1)*1.q0)
+      phi2   =  atan2(p4(2)*1.q0,p4(1)*1.q0)
+      phiq   =  atan2(k(2)*1.q0,k(1)*1.q0)
+      
+      p3q(0) = p3(0)*1.q0
+      modp3  = p3q(0)*sqrt(1.q0-mp2/p3q(0)**2)
+      p3q(1) = modp3*sqrt(1.q0-c1**2)*cos(phi1)*1.q0
+      p3q(2) = modp3*sqrt(1.q0-c1**2)*sin(phi1)*1.q0
+      p3q(3) = modp3*c1
+
+      p4q(0) = p4(0)*1.q0
+      modp4  = p4q(0)*sqrt(1.q0-mp2/p4q(0)**2)
+      p4q(1) = modp4*sqrt(1.q0-c2**2)*cos(phi2)*1.q0
+      p4q(2) = modp4*sqrt(1.q0-c2**2)*sin(phi2)*1.q0
+      p4q(3) = modp4*c2
+
+!      kq(0)  = (p1q(0)+p2q(0)-p3q(0)-p4q(0))*1.q0
+      modq  = kq(0)
+      kq(1) = -p3q(1)-p4q(1)
+      kq(2) = -p3q(2)-p4q(2)
+      kq(3) = -p3q(3)-p4q(3)
+      kq(0) = sqrt(kq(1)**2+kq(2)**2+kq(3)**2)
+
+
+      if((p1(1).eq.0.d0).and.(p1(2).eq.0.d0)) then
+         cm   = 1.d0
+         phip = 0.d0
+      endif
+
+      p1q(0) = (kq(0)+p3q(0)+p4q(0))/2.q0
+      modp1  = p1q(0)*sqrt(1.q0-me2/p1q(0)**2)
+      p1q(1) = modp1*sqrt(1.q0-cm**2)*cos(phim)*1.q0
+      p1q(2) = modp1*sqrt(1.q0-cm**2)*sin(phim)*1.q0
+      p1q(3) = modp1*cm
+
+      p2q(0) = p1q(0)
+      p2q(1) = -p1q(1)
+      p2q(2) = -p1q(2)
+      p2q(3) = -p1q(3)
+
+!      print*,qdot(p1q,p3q)
+      return
+      end
+
+********************************************************************
+      subroutine closestOLD(ng,qph,p1,p2,p3,p4,q1,q2,q3,q4,iclose)
+      implicit double precision (a-h,o-z)
+      parameter (maxph = 40)
+      dimension p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
+      dimension q1(0:3),q2(0:3),q3(0:3),q4(0:3)
+      character*2 fs
+      common/finalstate/fs
+      dimension qph(maxph,0:3)
+      dimension iclose(maxph)
+      integer emission(maxph)
+      common/radpattern/nph(4)
+
+      logical cond
+      common/radoption/ifisrfsr
+      integer ifisrfsr
+      iclose = 0
+
+      q1 = 0d0
+      q2 = 0d0
+      q3 = 0d0
+      q4 = 0d0
+
+c      p1modmu = 1.d0/sqrt(tridot(p1,p1))
+c      p2modmu = 1.d0/sqrt(tridot(p2,p2))
+c      p3modmu = 1.d0/sqrt(tridot(p3,p3))
+c      p4modmu = 1.d0/sqrt(tridot(p4,p4))
+
+      do k = 1,ng
+c---
+c         if (k.le.nph(1)) emission(k) = 1
+c         if (k.gt.nph(1).and.k.le.(nph(1)+nph(2))) emission(k) = 2
+c         if (k.gt.(nph(1)+nph(2)).and.k.le.(nph(1)+nph(2)+nph(3)))
+c     .        emission(k) = 3
+c         if (k.gt.(nph(1)+nph(2)+nph(3))) emission(k) = 4
+c---
+         q = qph(k,:)
+
+c         c1 = tridot(p1,q)*p1modmu/q(0)
+c         c2 = tridot(p2,q)*p2modmu/q(0)
+c         c3 = tridot(p3,q)*p3modmu/q(0)
+c         c4 = tridot(p4,q)*p4modmu/q(0)
+
+         c1 = dot(p1,q)
+         c2 = dot(p2,q)
+         c3 = dot(p3,q)
+         c4 = dot(p4,q)
+
+
+         cond=(fs.eq.'mr'.or.fs.eq.'pr')
+         if (fs.eq.'ee'.or.fs.eq.'mm'.or.fs.eq.'pp'
+     .       .or.fs.eq.'mr'.or.fs.eq.'er'.or.fs.eq.'pr') then
+            if (c1.lt.c2.and.c1.lt.c3.and.c1.lt.c4) iclose(k) = 1
+            if (c2.lt.c1.and.c2.lt.c3.and.c2.lt.c4) iclose(k) = 2
+            if (c3.lt.c2.and.c3.lt.c1.and.c3.lt.c4) iclose(k) = 3
+            if (c4.lt.c1.and.c4.lt.c2.and.c4.lt.c3) iclose(k) = 4
+         elseif (fs.eq.'gg'.or.fs.eq.'pi') then
+            if (c1.lt.c2) iclose(k) = 1
+            if (c2.lt.c1) iclose(k) = 2
+         endif
+
+         if (cond.and.ifisrfsr.eq.10) then
+            if (c1.lt.c2) iclose(k) = 1
+            if (c2.lt.c1) iclose(k) = 2
+         elseif (cond.and.ifisrfsr.eq.01) then
+            if (c3.lt.c4) iclose(k) = 3
+            if (c4.lt.c3) iclose(k) = 4
+         endif
+
+!!!
+ccc         iclose(k) = emission(k)
+!!!
+         ic = iclose(k)
+         if (ic.eq.1) then
+            q1 = q1 + q
+         endif
+         if (ic.eq.2) then
+            q2 = q2 + q
+         endif
+         if (ic.eq.3) then
+            q3 = q3 + q
+         endif
+         if (ic.eq.4) then
+            q4 = q4 + q
+         endif
+      enddo
+
+      return
+      end

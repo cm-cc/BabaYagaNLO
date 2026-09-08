@@ -10,7 +10,7 @@
       !! Input: squared momentum (q2)
       !! Output: complex form factor (ff), squared form factor (ff2)
       !! Implemented parametrisations: strong2020, cmd2, cmd3, bwsum2,
-      !! bwsum3, snd, babar, besiii, kloe2, phokhara
+      !! bwsum3, snd, babar, besiii, kloe2, phokhara, bern
       subroutine ffpi(q2,ff,ff2)
 
       implicit none
@@ -47,6 +47,8 @@
             call ffpi_bwsum2(q2,ff,ff2)
          elseif (what_ffpi.eq.'bwsum3') then
             call ffpi_bwsum3(q2,ff,ff2)
+         elseif (what_ffpi.eq.'bwsum') then
+            call ffpi_bwsum(q2,ff,ff2)
          elseif (what_ffpi.eq.'snd') then
             call ffpi_snd(q2,ff,ff2)
          elseif (what_ffpi.eq.'babar') then
@@ -57,8 +59,6 @@
             call ffpi_kloe2(q2,ff,ff2)
          elseif (what_ffpi.eq.'phokhara') then
             call ffpi_phokhara(q2,ff,ff2)
-c         elseif (what_ffpi.eq.'bern') then
-c            call ffpi_bern(q2,ff,ff2)
          else
             print*, 'Error: Invalid choice of pion form factor'
          endif
@@ -87,7 +87,7 @@ c            call ffpi_bern(q2,ff,ff2)
       !! Energy range: 4*m_pi^2 < s < 16 GeV^2
       subroutine ffpi_phokhara(q2,ff,ff2)
 
-      implicit none
+      implicit double precision(c-m)
 
       double precision q2,ff2
       double complex ff
@@ -117,6 +117,11 @@ c            call ffpi_bern(q2,ff,ff2)
       common/ffpiphokharacmn/pi,m_n,g_n,mod_n,arg_n,f_n,c_n,ifirst
       data ifirst /0/
 
+      double complex c_sum
+
+      external appr_sum
+      double complex appr_sum
+      double complex bw_rho
       !! Maximum safe q^2 (GeV^2)
       s_max = 16.d0
       call ffpi_warning(q2,s_max)
@@ -151,6 +156,7 @@ c            call ffpi_bern(q2,ff,ff2)
          m_n(4) = 2.320153904230950d0
          m_n(5) = 2.565026652070740d0
 
+         
          !! Widths of vector mesons(GeV)
          g_n(0) = 0.1470530254686560d0
          g_n(1) = 0.4290884148991568d0
@@ -158,6 +164,7 @@ c            call ffpi_bern(q2,ff,ff2)
          g_n(3) = 0.3d0
          g_n(4) = 0.4414835430304250d0
          g_n(5) = 0.4880784211162140d0
+
 
          !! Rho mass and width (GeV)
          m_rho = m_n(0)
@@ -208,6 +215,7 @@ c            call ffpi_bern(q2,ff,ff2)
      &   + f_n(4) * bw_gs(m_n(4),g_n(4),q2)
      &   + f_n(5) * bw_gs(m_n(5),g_n(5),q2))
 
+
       !! Add Dual QCD contribution if activated
       if (idqcd.eq.1.and.ndqcd.gt.5) then
          ff = ff + ff_dqcd(q2,ndqcd)
@@ -218,7 +226,6 @@ c            call ffpi_bern(q2,ff,ff2)
 
       return
       end
-
       !!==============================================================!!
 
       !! Charged pion form factor from CMD-2
@@ -408,6 +415,9 @@ c            call ffpi_bern(q2,ff,ff2)
       double precision ampi
       common/hparam/ampi
 
+      
+      common/resonancesgvmd/nres
+      
       integer i,nres
       double precision m_n(1:9),g_n(1:9)
       double precision mod_n(1:9),arg_n(1:9)
@@ -489,6 +499,9 @@ c            call ffpi_bern(q2,ff,ff2)
       double precision ampi
       common/hparam/ampi
 
+      
+      common/resonancesgvmd/nres
+      
       integer i,nres
       double precision m_n(1:9),g_n(1:9)
       double precision mod_n(1:9),arg_n(1:9)
@@ -551,7 +564,107 @@ c            call ffpi_bern(q2,ff,ff2)
          ff = ff + a_n(i)*bw_gvmd(m_n(i),g_n(i),q2)
       enddo
 
+!      ff=(1.d0,0.d0)
       !! Squared pion form factor
+      ff2 = real(ff)**2 + aimag(ff)**2
+
+      return
+      end
+
+!==============================================================!!
+
+      !! Fit of all pion form factor data as a sum of BW functions
+      !! Inspired by the form factor for the Strong2020 report
+      !! To be used in the GVMD approach
+      !! Input: squared momentum (q2)
+      !! Output: complex form factor (ff), squared form factor (ff2)
+      !! Energy range: 4*m_pi^2 < s < 9 GeV^2
+      subroutine ffpi_bwsum(q2,ff,ff2)
+
+      implicit none
+
+      double precision q2,ff2
+      double complex ff
+
+      double precision m_pi,m_rho,g_rho,m_om,g_om
+      common/par_hadrons/m_pi,m_rho,g_rho,m_om,g_om
+
+      double precision ampi
+      common/hparam/ampi
+
+      common/resonancesgvmd/nres
+
+      
+      integer i,nres
+      double precision m_n(1:9),g_n(1:9)
+      double precision mod_n(1:9),arg_n(1:9)
+      double complex a_n(1:9),a_sum
+      common/par_gvmd/m_n,g_n,a_n
+
+      double complex bw_gvmd
+
+      double precision s_max
+      common/smax/s_max
+
+      double complex bw_const
+
+      double complex im
+      im = (0.d0,1.d0)
+
+      !! Maximum safe q^2 (GeV^2)
+      s_max = 9.d0
+!      call ffpi_warning(q2,s_max)
+       
+      !! Charged pion mass (GeV)
+      m_pi = ampi
+
+      !! Number of resonances
+      nres = 6
+      
+      !! Masses of vector mesons (GeV)
+      m_n(1) = 7.55179041d-1 ! rho
+      m_n(2) = 7.81812114d-1 ! omega
+      m_n(3) = 1.01947000d0 ! phi
+      m_n(4) = 1.31996414d0 ! rho'
+      m_n(5) = 1.7321592d0 ! rho''
+      m_n(6) = 2.2183760d0 ! rho'''
+
+      !! Widths of vector mesons (GeV)
+      g_n(1) = 1.39624775d-1
+      g_n(2) = 7.17266138d-3
+      g_n(3) = 4.87700000d-3
+      g_n(4) = 6.98936489d-1
+      g_n(5) = 3.20028125d-1
+      g_n(6) = 1.23500000d-1
+
+      !! Resonance amplitudes
+
+      mod_n(2) = -7.54529985d-3
+      mod_n(3) =  7.35587591d-4
+      mod_n(4) =  2.39521811d-1
+      mod_n(5) =  8.76050044d-2
+      mod_n(6) =  6.35239511d-3
+      
+      arg_n(2) = 4.81760780d0
+      arg_n(3) = 5.58334149d0
+      arg_n(4) = 3.09486368d0
+      arg_n(5) = 5.44703822d-1
+      arg_n(6) = -2.9881100d-1
+
+      
+      a_n(1) = (1.d0,0.d0)
+      a_sum = a_n(1)
+      do i=2,nres
+         a_n(i) = mod_n(i)*exp(im*arg_n(i))
+         a_sum = a_sum + a_n(i)
+      enddo
+
+      !! Form factor
+      ff = (0.d0, 0.d0)
+      do i=1,nres
+         a_n(i) = a_n(i)/a_sum
+         ff = ff + a_n(i)*bw_gvmd(m_n(i),g_n(i),q2)
+      enddo
       ff2 = real(ff)**2 + aimag(ff)**2
 
       return
@@ -995,6 +1108,48 @@ c            call ffpi_bern(q2,ff,ff2)
      &   / (1 + f_n(1) + f_n(2) + f_n(3))
 
 !      ff=bw_const(0.77526d0,0.1474d0,q2)
+!      ff = (1.d0,0.d0)
+      !! Squared pion form factor
+      ff2 = real(ff)**2 + aimag(ff)**2
+
+      return
+      end
+
+      !!==============================================================!!
+
+      !! Charged pion form factor from dispersion relations
+      !! Based on experimental data before CMD-3
+      !! Reference: JHEP 02 (2019) 006
+      !! Input: squared momentum (q2)
+      !! Output: squared form factor (ff2)
+      !! Energy range: 4*m_pi^2 < s < 4 GeV^2
+      subroutine ffpi_bern(q2,ff,ff2)
+
+      implicit none
+
+      double precision q2,ff2
+      double complex ff
+
+      double complex ffpi_table,ffpi_interpolate
+      character*50 input_file
+
+      integer nitems,interpol
+
+      !! Input file location
+      input_file = 'ffpi_bern_input.txt'
+
+      !! Number of items in the input table (< 2000)
+      nitems = 1000
+
+      !! Flag to activate the linear interpolation of the input table
+      interpol = 1
+
+      !! Pion form factor
+      if (interpol.eq.1) then
+         ff = ffpi_interpolate(sqrt(q2),input_file,nitems)
+      else
+         ff = ffpi_table(sqrt(q2),input_file,nitems)
+      endif
 
       !! Squared pion form factor
       ff2 = real(ff)**2 + aimag(ff)**2

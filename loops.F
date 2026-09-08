@@ -602,6 +602,9 @@ c         do hh = 15, 15 !15 ! only half, below the factor of 2!!
       integer igvmdwarning
       data igvmdwarning /0/
 
+      
+      common/indexfsrdisp/iFSRdisp
+      integer iFSRdisp
 #ifdef COLLIER
       integer rank
       parameter (rank = 2)
@@ -615,9 +618,11 @@ c         do hh = 15, 15 !15 ! only half, below the factor of 2!!
       double complex dncuv(0:rank/2,0:rank,0:rank,0:rank)
       double complex b(0:1/2,0:1),buv(0:1/2,0:1)
       double complex b0cll,b1cll,db0cll,db1cll
+      dnd=0.d0
+      dnduv=0.d0
 
 ******************************************************
-      call InitEvent_cll(1)
+!      call InitEvent_cll(1)
       call GetMuUV2_cll(mu2dim)
 #endif
 #ifdef LOOPTOOLS
@@ -991,7 +996,6 @@ c$$$     &        mpi2*t - 8*me2*t - 4*me2*s + 8*me2*mpi2
 
 
          vertex_pi= vertxbornd
-
 *     vertex correction with the virtual photon coming from the 4-linear vertex
 #ifdef LOOPTOOLS
          B0FFmpi0mpi= B0i(bb0,mpi2,0.d0,mpi2)
@@ -1472,7 +1476,6 @@ c$$$     &        t - 8*me2*t - 4*me2*s + 8*me2*mpi2 )
      +        * ec6 * pi216m1/s
 *                            (the phase is (+i)*(+i) the latter from Bornd)
 *
-
       !!==============================================================!!
       !!                     GVMD IMPLEMENTATION                      !!
       !!==============================================================!!
@@ -1487,6 +1490,10 @@ c$$$     &        t - 8*me2*t - 4*me2*s + 8*me2*mpi2 )
       elseif (what_ffpi.eq.'bwsum3') then
          call ffpi(s,ffpis,ffpis2)
          nres = 4
+      elseif (what_ffpi.eq.'bwsum') then
+         call ffpi(s,ffpis,ffpis2)
+         nres = 6
+         
       elseif (what_ffpi.eq.'cmd2') then
          call ffpi_bwsum2(s,ffpis,ffpis2)
          nres = 3
@@ -1761,7 +1768,7 @@ c$$$     &        t - 8*me2*t - 4*me2*s + 8*me2*mpi2 )
 
       !! Seagull vertex
 
-      vertex_seagull_gvmd = vertex_seagull_gvmd -
+      vertex_seagull_gvmd = vertex_seagull_gvmd +   !- CHANGED MARCO 03/03/26
      &   (8*a_n(j)*a_n(k)*alpha**3*pi*(B0lj(j)*lv2(j)*lv2(k) - B0lj(k)*
      &   lv2(j)*lv2(k) - B0pj(j)*lv2(j)*lv2(k) + B0pj(k)*lv2(j)*lv2(k) +
      &   4*B0p*lv2(j)*mpi2 - 4*B0pj(k)*lv2(j)*mpi2 - 4*B0p*lv2(k)*mpi2 +
@@ -1770,11 +1777,12 @@ c$$$     &        t - 8*me2*t - 4*me2*s + 8*me2*mpi2 )
 
       endif
 
-      !! To remove GVMD correction to FSR
+      !! To remove GVMD correction to FSR if iFSRdisp = 0
+      if(iFSRdisp.eq.0) then
       vertex_pi_gvmd = vertex_pi
       vertex_seagull_gvmd = vertex_seagull1
       rcounterterms_pi_gvmd = rcounterterms_pi
-
+      endif
       !!=====!!
       !! IFI !!
       !!=====!!
@@ -5374,7 +5382,8 @@ c	print*,virtual
 	double complex momvec(0:3,4)
 
 
-	double precision routing(5)
+c	double precision routing(5)
+	double complex routing(5)
 	double complex average
 
 
@@ -6133,6 +6142,8 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
         common/ialpharunning/iarun
         integer iarun
 
+        common/indexfsrdisp/iFSRdisp
+        integer iFSRdisp
 **********FF
 
 	integer iffpi
@@ -6264,6 +6275,9 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 	double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
 	double precision qph(40,0:3)
 	double precision virtual,virtual1
+        Complex*32 gvmdq,gvmdq1,gvmdq2,mq,derampl
+        complex*32 gvmdq0,deltafsr,dfsr2
+        complex*16 gvmd
 	real*8 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
 	real*8 x12,x13,x14,x15,x23,x24,x25,x34,x35,x45
 	real*8 e2,e6,me2,me4,me6,mp2,mp4,mp6
@@ -6290,7 +6304,12 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 
         common/ialpharunning/iarun
         integer iarun
-
+        common/indexfsrdisp/iFSRdisp
+        integer iFSRdisp
+**************CHECK FULVIO
+        complex*32 c1Bd,c2Bd,c3Bd,c4Bd,c5Bd
+        common/borncouplings/c1Bd,c2Bd,c3Bd,c4Bd,c5Bd
+        complex*32 e3
 **********FF
 
 	integer iffpi
@@ -6301,6 +6320,32 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 	double complex ffpifs
 	double precision ffpifs2
 
+**********GVMD
+        integer i,j,k
+        double complex ct,im,cij
+        double precision m_n(1:9),g_n(1:9)
+        double complex m1,m2,m3
+        double complex a_n(1:9),lv2(1:9),lv2diff
+        common/par_gvmd/m_n,g_n,a_n
+
+        common/resonancesgvmd/nres
+        integer nres
+        real*16 delta,delta1,math,form
+        
+        common/gvmdchecks/iscoll,fscoll
+        integer iscoll,fscoll
+********FsQED
+        double precision spmin,spmax
+        double complex sp,ss
+        double precision wsp,wss
+        double complex dispsp,dispss
+        double complex ffpisp,ffpiss
+        complex*32 dispq,dispqct
+        complex*32 dispq1,dispq1ct
+        double complex dispspq,dispssq
+        double precision rdiff
+        common/compotontensor/compttens
+        integer compttens
 
 *********CLL STUFF
 	double complex cnpi(0:1,0:2,0:2)
@@ -6382,6 +6427,7 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 
 	e2 = 4.d0*pi*alpha
 	e6 = e2*e2*e2
+        
 	ame2=ame*ame
 	ampi2=ampi*ampi
         me2=ame2
@@ -6436,6 +6482,10 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 ****************
 
 #ifdef COLLIER
+	call GetMuUV2_cll(mu2dim)
+        
+        call GetDeltaUV_cll(deltauv)
+        
 !       call SetDeltaUV_cll(1000000d0)
 	call A0_cll(A0ap,a1*ampi2)
 
@@ -6550,12 +6600,666 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 !
  	virtual=virtual+real(elmat)*ffpifs2
 
+
+*---------------------------------------------
+*------------------GVMD-----------------------
+*---------------------------------------------
+        if(iFSRdisp.eq.1) then
+           if(iffpi.eq.2) then
+!!!!! GIÀ DEFINITI COSÌ NEL FF,OSSIA A_N/CT
+              im=(0.d0,1.d0)           
+              do i=1,nres
+
+                 lv2(i) = m_n(i)**2 - im*m_n(i)*g_n(i)
+              enddo
+!!!!!!!!!NOW CALCULATION AS I IMPLEMENTED IT IN THE LATEX
+              do i=1,nres
+                 cij=-a_n(i)
+                 do k=1,nres
+
+                    if(k.ne.i) then
+                       cij = cij + 2.d0*a_n(k)*lv2(k)/(lv2(i)-lv2(k))
+                    endif
+                 enddo
+                 delta=1.q-10
+                 
+                 if(fscoll.eq.1) then
+                    delta=1.q-5
+                 endif
+                 
+                 mq=lv2(i)*1.q0
+                 
+!!!!  CT li aggiungo qui in quad_precision, 0 stands for value,1 for the analytical derivative
+                 
+                 call ct_purefsr_quad(p1,p2,p3,p4,q,mq,gvmdq,qph,0)
+                 virtual=virtual+real(a_n(i)*cij*gvmdq)
+                 
+                 call purefsr_quad(p1,p2,p3,p4,q,mq,gvmdq,qph)
+                 virtual=virtual+real(a_n(i)*cij*gvmdq)
+!!!!!!!!!!!!!TO FIND DERIVATIVE
+                 
+                 call purefsr_quad(p1,p2,p3,p4,q,mq*(1.q0+1.q0*delta)
+     >                ,gvmdq1,qph)
+
+                 derampl=(gvmdq1-gvmdq)/(delta*mq)
+                 
+                 if(fscoll.eq.1) then
+                    call purefsr_quad(p1,p2,p3,p4,q,mq*(1.q0-1.q0*delta)
+     >                   ,gvmdq,qph)
+                    derampl=(gvmdq1-gvmdq)/(2.q0*delta*mq)
+                 endif
+                 virtual=virtual+real(a_n(i)**2*lv2(i)*derampl)
+
+!!!   LA DERIVATA DEI CT è fatta qui
+                 
+                 call ct_purefsr_quad(p1,p2,p3,p4,q,mq,derampl,qph,1)
+
+                 virtual=virtual+real(a_n(i)**2*lv2(i)*derampl)
+
+              enddo
+*---------------------------------------------
+*------------------FsQED----------------------
+*---------------------------------------------
+              
+           elseif(iffpi.eq.3) then
+              if(compttens.eq.3) then
+                 virtual=(0.d0,0.d0)
+              endif
+
+!--------QUI GENERO S' TRA 4*MP^2 E 9 GeV^2 (ASSUMIAMO VALIDO IL FF FINO A 3 GEV)------           
+              
+              spmin = 4.d0*mp2
+              spmax = 9.d0
+              call sp_disp(spmin,spmax,sp,wsp)
+              call ffpi(real(sp),ffpisp,ffpifs2)
+              
+              call purefsr_disp(p1,p2,p3,p4,q,sp,dispsp,qph)
+
+              virtual=virtual-2.d0/pi*real(aimag(ffpisp)/sp*dispsp/wsp)
+!--------QUI IL DOPPIO DISPERSIVO
+              
+              call sp_disp(spmin,spmax,ss,wss)
+              call ffpi(real(ss),ffpiss,ffpifs2)
+              
+              call purefsr_disp(p1,p2,p3,p4,q,ss,dispss,qph)
+              
+!-------Se |s'-s''|/s'<10^-5 il rapporto in doppia potrebbe diventare instabile--------!
+!-------quindi switcho in 4-pla precisione per calcolare il ratio----------------------!
+              
+              if(abs((sp-ss)/sp).ge.1d-5) then
+
+                 virtual=virtual+1.d0/(pi**2)*
+     >                real(aimag(ffpiss)/ss/wss
+     >                *aimag(ffpisp)/sp/wsp*
+     >                1.d0/(ss-sp)*(dispss*ss-dispsp*sp))
+
+              else
+!Amplitude at s'
+                 call ct_purefsr_quad(p1,p2,p3,p4,q,sp*1.q0,dispqct,
+     >                qph,0)
+                 call purefsr_quad(p1,p2,p3,p4,q,sp*1.q0,dispq,qph)
+                 dispspq=dispq+dispqct
+!Amplitude at s''
+                 call ct_purefsr_quad(p1,p2,p3,p4,q,ss*1.q0,dispq1ct,
+     >                qph,0)
+                 call purefsr_quad(p1,p2,p3,p4,q,ss*1.q0,dispq1,qph)
+                 dispssq=dispq1+dispq1ct
+                 
+                 derampl=(dispssq*ss*1.q0-dispspq*sp*1.q0)
+     >                /(ss*1.q0-sp*1.q0)
+                 
+                 virtual=virtual+1.d0/(pi**2)*
+     >                real(aimag(ffpiss)/ss/wss
+     >                *aimag(ffpisp)/sp/wsp*derampl)
+              endif
+
+              
+              
+              
+           endif
+        endif
+        
 	virtual=4d0*virtual*e6*alpha/(2d0*pi)
-
-
-
+        return        
       end
 *****************************************************
+      subroutine purefsr_disp(p1,p2,p3,p4,q,mq,virtual,qph)
+#ifdef COLLIER 
+        use collier
+#endif
+        implicit complex*16 (z)
+!     implicit none
+        double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
+        double precision pt1(0:3),pt2(0:3),pt3(0:3),pt4(0:3),qt(0:3)
+        double precision qph(40,0:3)
+	double precision virtual1
+
+        complex*16 m1,re,mq,dzphi,dmpi,m12
+        complex*16 virtual,deltafsr
+	complex*16 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
+ 	complex*16 e2,e6,x12,x13,x14,x15,x23,x24,x25,x34,x35,x45
+        complex*16 ame2,ammu2,me2,me4,mp2,mp4,ampi2,mp6,me6
+        real*16 zdeltauv,zphmass2,zmu2dim
+        real*16 e,e3,e5,pi2
+        common/hparam/ampi
+	double precision ame,ammu,convfac,alpha,pi,s,s1,ampi
+	common/parameters/ame,ammu,convfac,alpha,pi
+
+        real*16 p1q(0:3),p2q(0:3),p3q(0:3),p4q(0:3),qq(0:3)
+        common/momquad/p1q,p2q,p3q,p4q,qq
+        external qdot
+        real*16 qdot
+        external dotq
+        real*16 dotq
+        real*8 elmatfsrd
+        complex*16 elmatifid
+	complex*32 elmat,elmat1,elmat2,elmati,elmatf
+	character*2 fs
+	character*3 ifc
+	common/finalstate/fs
+	
+	real*8 deltauv,lambda2,mu2dim,m2min
+	common/loop/deltauv,lambda2,mu2dim,m2min
+
+	double complex masses(0:4)
+	double complex mominv(1:10)
+	double complex momvec(0:3,4)
+
+	integer ier
+c	double precision routing(5), average
+	double complex routing(5), average
+	
+
+        external vpolc
+        double complex vpolc,alphar
+        
+        common/ialpharunning/iarun 
+        integer iarun 	
+        
+	integer i
+
+        common/lt/ltint,quadevents,ilt
+        integer ltint,quadevents,ilt
+        
+	common/softphotonmass/phmass
+	real*8 phmass
+
+	external dot
+	double precision dot
+
+***********CLL
+      	double complex cnpi(0:1,0:2,0:2)
+	double complex cnpiuv(0:1,0:2,0:2)	
+	double complex dnpi(0:1,0:2,0:2,0:2)
+	double complex dnpiuv(0:1,0:2,0:2,0:2)    
+	         
+	double complex d1
+	parameter (d1 = (1.d0,0.d0))    
+	double complex c1
+	parameter (c1 = (1.d0,0.d0))
+
+**********FF
+
+	integer iffpi
+	character*10 what_ffpi
+	common/ffpioption/iffpi,what_ffpi
+	double complex ffpiis
+	double precision ffpiis2
+	double complex ffpifs
+	double precision ffpifs2
+
+        common/radoption/ifisrfsr
+        integer ifisrfsr
+
+        common/pavered/p1red,p2red,p3red,p4red,kred
+        double precision p1red(0:3),p2red(0:3),p3red(0:3),p4red(0:3)
+        double precision kred(0:3)
+
+        common/gvmdchecks/iscoll,fscoll
+        integer iscoll,fscoll
+        common/checkform/intltgvmd
+        integer intltgvmd
+**********LOOP FUNCTIONS
+        complex*16 Cim(2)
+        complex*16 Cijm(4)
+        complex*16 C0m
+
+        complex*16 Dim(3)
+        complex*16 Dijm(7)
+        complex*16 D0m
+
+        complex*16 A0ap,A0am1,B0appm1
+        complex*16 B0ax34pp,C0appx34pm1p
+        complex*16 B0ax35pm1,B0ax45pm1
+        complex*16 DB0apm1p
+
+        complex*16 C0apx350pm1p
+        complex*16 C1apx350pm1p,C2apx350pm1p,C00apx350pm1p
+        complex*16 C11apx350pm1p,C12apx350pm1p,C22apx350pm1p
+        complex*16 C00apx12x35m1pp,C12apx12x35m1pp,C0apx12x35m1pp
+
+        complex*16 C0apx450pm1p
+        complex*16 C1apx450pm1p,C2apx450pm1p,C00apx450pm1p
+        complex*16 C11apx450pm1p,C12apx450pm1p,C22apx450pm1p
+
+        complex*16 C0apx12x45m1pp,C1apx12x45m1pp,C1ax45x12pm1pp
+        complex*16 C00apx12x45m1pp,C11apx12x45m1pp,C11ax45x12pm1pp
+        complex*16 C12apx12x45m1pp
+
+        complex*16 C0ax45x12pm1pp,C00ax45x12pm1pp,C12ax45x12pm1pp
+
+        complex*16 C0apx45x12pm1p,C2apx45x12pm1p,C2ax45px12pm1p
+        complex*16 C00apx45x12pm1p,C22apx45x12pm1p
+        complex*16 C22ax45px12pm1p
+
+        complex*16 C0ax35x12pm1pp,C1apx12x35m1pp,C1ax35x12pm1pp
+        complex*16 C00ax35x12pm1pp,C11apx12x35m1pp,C11ax35x12pm1pp
+        complex*16 C12ax35x12pm1pp
+
+        complex*16 C0apx35x12pm1p,C2apx35x12pm1p,C2ax35px12pm1p
+        complex*16 C00apx35x12pm1p,C22apx35x12pm1p
+        complex*16 C22ax35px12pm1p
+
+!!!!!!!!!!BOX
+
+        complex*16 D0appx120x34x35pm1pp,D2app0x12x34x35pm1pp
+        complex*16 D3app0x12x34x35pm1pp,D00app0x12x34x35pm1pp
+        complex*16 D33app0x12x34x35pm1pp,D0app0x12x34x35pm1pp
+        complex*16 D2appx120x34x35pm1pp,D3appx120x34x35pm1pp
+        complex*16 D00appx120x34x35pm1pp,D13a0ppx12x35x34ppm1p
+        complex*16 D22app0x12x34x35pm1pp,D22appx120x34x35pm1pp
+        complex*16 D23app0x12x34x35pm1pp,D23appx120x34x35pm1pp
+        complex*16 D33appx120x34x35pm1pp
+
+        complex*16 C1ax12x340ppp,C00a0x12x34ppp
+        complex*16 C11ax12x340ppp,C12a0x34x12ppp
+        complex*16 C12a0x12x34ppp
+
+!!!!!!!!!!!!!!!!!!!!!!
+
+        complex*16 D0ap0x12px35x34m1ppp
+        complex*16 D1ap0x12px35x34m1ppp,D2ap0x12px35x34m1ppp
+        complex*16 D3ap0x12px35x34m1ppp
+        complex*16 D00ap0x12px35x34m1ppp,D11ap0x12px35x34m1ppp
+        complex*16 D12ap0x12px35x34m1ppp
+        complex*16 D13ap0x12px35x34m1ppp,D22ap0x12px35x34m1ppp
+        complex*16 D23ap0x12px35x34m1ppp,D33ap0x12px35x34m1ppp
+
+        complex*16 D0ap0x12px45x34m1ppp
+        complex*16 D1ap0x12px45x34m1ppp,D2ap0x12px45x34m1ppp
+        complex*16 D3ap0x12px45x34m1ppp
+        complex*16 D00ap0x12px45x34m1ppp,D11ap0x12px45x34m1ppp
+        complex*16 D12ap0x12px45x34m1ppp
+        complex*16 D13ap0x12px45x34m1ppp,D22ap0x12px45x34m1ppp
+        complex*16 D23ap0x12px45x34m1ppp,D33ap0x12px45x34m1ppp        
+************FILL COMMON FOR PAVE REDUCTION
+        p1red = p1
+        p2red = p2
+        p3red = p3
+        p4red = p4
+        kred  = q
+
+        
+        re =(1.q0,0.q0)
+        e = sqrt(4.q0*pi*alpha*1.q0)
+        e3 =  e*e*e
+        e5 =  e*e*e*e*e
+        pi2 = pi*pi*1.q0
+        
+	e2 = 4.q0*pi*alpha*1.q0
+	e6 = e2*e2*e2*1.q0
+	ame2=(ame*1.q0)*(ame*1.q0)*re
+	ampi2=(ampi*1.q0)*(ampi*1.q0)*re
+        me2=ame2*re
+        mp2=ampi2*re
+        me4=me2**2*re
+        me6=me2**3*re
+        mp4=mp2**2*re
+        mp6=mp2**3*re
+
+c$$$        print*,'me2',me2
+c$$$        print*,'mp2',mp2
+        call shellquad(p1,p2,p3,p4,q,p1q,p2q,p3q,p4q,qq)
+
+        p1p2 = qdot(p1q,p2q)*re
+        p1p3 = qdot(p1q,p3q)*re
+        p1p4 = qdot(p1q,p4q)*re
+	kp1  = qdot(p1q,qq)*re
+        p2p3 = qdot(p2q,p3q)*re
+	p2p4 = qdot(p2q,p4q)*re
+        kp2  = qdot(p2q,qq)*re
+        kp3  = qdot(p3q,qq)*re
+	p3p4 = qdot(p3q,p4q)*re
+	kp4  = qdot(p4q,qq)*re
+
+        x12 = qdot(p1q+p2q,p1q+p2q)*re
+	x13 = qdot(p1q-p3q,p1q-p3q)*re
+	x14 = qdot(p1q-p4q,p1q-p4q)*re
+	x15 = qdot(p1q-qq,p1q-qq)*re
+        x23 = qdot(p2q-p3q,p2q-p3q)*re
+        x24 = qdot(p2q-p4q,p2q-p4q)*re
+	x25 = qdot(p2q-qq,p2q-qq)*re
+        x34 = qdot(p3q+p4q,p3q+p4q)*re
+        x35 = qdot(p3q+qq,p3q+qq)*re
+        x45 = qdot(p4q+qq,p4q+qq)*re
+
+        
+        elmat1=(0.q0,0.q0)
+        elmat2=(0.q0,0.q0)
+        
+**************
+	ffpifs=(1.d0,0.d0)
+	ffpifs2=1.d0
+        
+	ffpiis=(1.d0,0.d0)
+	ffpiis2=1.d0
+	s=2.d0*(ame**2+p1p2)
+	s1=2.d0*(ampi**2+p3p4)
+	if(iffpi.gt.0) then
+
+		call ffpi(s,ffpifs,ffpifs2) 
+		call ffpi(s1,ffpiis,ffpiis2)
+	        
+	endif	
+
+******ALPHA RUNNING	
+	ffpiis=ffpiis*vpolc(s1)
+	ffpiis2=ffpiis*CONJG(ffpiis)
+	
+	ffpifs=ffpifs*vpolc(s)
+	ffpifs2=ffpifs*CONJG(ffpifs)
+****************
+!        print*,'deltauv',deltauv
+
+        
+!        print*,'deltauv',deltauv
+        m1      = sqrt(mq)
+        m12     = mq
+        virtual =(0.q0,0.q0)
+
+        A0ap        = (0.D0, 0.D0)
+        A0am1       = (0.D0, 0.D0)
+        B0appm1     = (0.D0, 0.D0)
+        DB0apm1p    = (0.D0, 0.D0)
+        B0ax34pp    = (0.D0, 0.D0)
+        C0appx34pm1p= (0.D0, 0.D0)
+        B0ax35pm1   = (0.D0, 0.D0)
+        B0ax45pm1   = (0.D0, 0.D0)
+
+        ! C 350
+        C0apx350pm1p  = (0.D0, 0.D0)
+        C1apx350pm1p  = (0.D0, 0.D0)
+        C2apx350pm1p  = (0.D0, 0.D0)
+        C00apx350pm1p = (0.D0, 0.D0)
+        C11apx350pm1p = (0.D0, 0.D0)
+        C12apx350pm1p = (0.D0, 0.D0)
+        C22apx350pm1p = (0.D0, 0.D0)
+
+        ! C 450
+        C0apx450pm1p  = (0.D0, 0.D0)
+        C1apx450pm1p  = (0.D0, 0.D0)
+        C2apx450pm1p  = (0.D0, 0.D0)
+        C00apx450pm1p = (0.D0, 0.D0)
+        C11apx450pm1p = (0.D0, 0.D0)
+        C12apx450pm1p = (0.D0, 0.D0)
+        C22apx450pm1p = (0.D0, 0.D0)
+
+        ! C 12x45
+        C0apx12x45m1pp  = (0.D0, 0.D0)
+        C1apx12x45m1pp  = (0.D0, 0.D0)
+        C1ax45x12pm1pp  = (0.D0, 0.D0)
+        C00apx12x45m1pp = (0.D0, 0.D0)
+        C11apx12x45m1pp = (0.D0, 0.D0)
+        C11ax45x12pm1pp = (0.D0, 0.D0)
+        C12apx12x45m1pp = (0.D0, 0.D0)
+        C0ax45x12pm1pp  = (0.D0, 0.D0)
+        C00ax45x12pm1pp = (0.D0, 0.D0)
+        C12ax45x12pm1pp = (0.D0, 0.D0)
+
+        ! C 45x12 p
+        C0apx45x12pm1p  = (0.D0, 0.D0)
+        C2apx45x12pm1p  = (0.D0, 0.D0)
+        C2ax45px12pm1p  = (0.D0, 0.D0)
+        C00apx45x12pm1p = (0.D0, 0.D0)
+        C22apx45x12pm1p = (0.D0, 0.D0)
+        C22ax45px12pm1p = (0.D0, 0.D0)
+
+        ! C 35x12
+        C0ax35x12pm1pp  = (0.D0, 0.D0)
+        C0apx12x35m1pp  = (0.D0, 0.D0)
+        C1apx12x35m1pp  = (0.D0, 0.D0)
+        C1ax35x12pm1pp  = (0.D0, 0.D0)
+        C12apx12x35m1pp = (0.D0, 0.D0)
+        C00ax35x12pm1pp = (0.D0, 0.D0)
+        C11apx12x35m1pp = (0.D0, 0.D0)
+        C00apx12x35m1pp = (0.D0, 0.D0)
+        C11ax35x12pm1pp = (0.D0, 0.D0)
+        C12ax35x12pm1pp = (0.D0, 0.D0)
+        C0apx35x12pm1p  = (0.D0, 0.D0)
+        C2apx35x12pm1p  = (0.D0, 0.D0)
+        C2ax35px12pm1p  = (0.D0, 0.D0)
+        C00apx35x12pm1p = (0.D0, 0.D0)
+        C22apx35x12pm1p = (0.D0, 0.D0)
+        C22ax35px12pm1p = (0.D0, 0.D0)
+
+        ! D 35
+        D0appx120x34x35pm1pp   = (0.D0, 0.D0)
+        D2app0x12x34x35pm1pp   = (0.D0, 0.D0)
+        D3app0x12x34x35pm1pp   = (0.D0, 0.D0)
+        D00app0x12x34x35pm1pp  = (0.D0, 0.D0)
+        D33app0x12x34x35pm1pp  = (0.D0, 0.D0)
+        D0app0x12x34x35pm1pp   = (0.D0, 0.D0)
+        D2appx120x34x35pm1pp   = (0.D0, 0.D0)
+        D3appx120x34x35pm1pp   = (0.D0, 0.D0)
+        D00appx120x34x35pm1pp  = (0.D0, 0.D0)
+        D13a0ppx12x35x34ppm1p  = (0.D0, 0.D0)
+        D22app0x12x34x35pm1pp  = (0.D0, 0.D0)
+        D22appx120x34x35pm1pp  = (0.D0, 0.D0)
+        D23app0x12x34x35pm1pp  = (0.D0, 0.D0)
+        D23appx120x34x35pm1pp  = (0.D0, 0.D0)
+        D33appx120x34x35pm1pp  = (0.D0, 0.D0)
+
+        ! C extra
+        C1ax12x340ppp   = (0.D0, 0.D0)
+        C00a0x12x34ppp  = (0.D0, 0.D0)
+        C11ax12x340ppp  = (0.D0, 0.D0)
+        C12a0x34x12ppp  = (0.D0, 0.D0)
+        C12a0x12x34ppp  = (0.D0, 0.D0)
+
+#ifdef COLLIER
+
+        call A0_cll(A0ap,mp2*c1)
+        
+        call A0_cll(A0am1,mq*c1)
+
+        call B0_cll(B0ax34pp,x34*c1,mp2*c1,mp2*c1)
+
+        call B0_cll(B0appm1,mp2*c1,mp2*c1,mq*c1)
+
+        call DB0_cll(DB0apm1p,mp2*c1,mq*c1,mp2*c1)
+
+        call B0_cll(B0ax35pm1,x35*c1,mp2*c1,mq*c1)
+
+        call B0_cll(B0ax45pm1,x45*c1,mp2*c1,mq*c1)
+
+        call C0_cll(C0appx34pm1p,mp2*c1,mp2*c1,x34*c1,
+     >       mp2*c1,mq*c1,mp2*c1)
+
+        call C_cll(cnpi,cnpiuv,mp2*c1,x35*c1,0.d0*c1,mp2*c1,
+     >       mq*c1,mp2*c1,2)
+        C0apx350pm1p  = cnpi(0,0,0)
+        C1apx350pm1p  = cnpi(0,1,0)
+        C2apx350pm1p  = cnpi(0,0,1)
+	C00apx350pm1p = cnpi(1,0,0)
+	C11apx350pm1p = cnpi(0,2,0)
+	C12apx350pm1p = cnpi(0,1,1)
+	C22apx350pm1p = cnpi(0,0,2)
+
+        call C_cll(cnpi,cnpiuv,mp2*c1,x45*c1,0.d0*c1,mp2*c1,
+     >       mq*c1,mp2*c1,2)
+        C0apx450pm1p  = cnpi(0,0,0)
+        C1apx450pm1p  = cnpi(0,1,0)
+        C2apx450pm1p  = cnpi(0,0,1)
+	C00apx450pm1p = cnpi(1,0,0)
+	C11apx450pm1p = cnpi(0,2,0)
+	C12apx450pm1p = cnpi(0,1,1)
+	C22apx450pm1p = cnpi(0,0,2)
+
+        call C_cll(cnpi,cnpiuv,mp2*c1,x12*c1,x45*c1,mq*c1,
+     >       mp2*c1,mp2*c1,2)
+        C0apx12x45m1pp  = cnpi(0,0,0)
+        C1apx12x45m1pp  = cnpi(0,1,0)
+        C1ax45x12pm1pp  = cnpi(0,0,1)
+        C00apx12x45m1pp = cnpi(1,0,0)
+        C11apx12x45m1pp = cnpi(0,2,0)
+        C12apx12x45m1pp = cnpi(0,1,1)
+        C11ax45x12pm1pp = cnpi(0,0,2)
+
+        C0ax45x12pm1pp  = C0apx12x45m1pp
+        C00ax45x12pm1pp = C00apx12x45m1pp
+        C12ax45x12pm1pp = C12apx12x45m1pp
+        C0apx45x12pm1p  = C0apx12x45m1pp
+
+        C2apx45x12pm1p  = cnpi(0,0,1)
+        C00apx45x12pm1p = cnpi(1,0,0)
+        C2ax45Px12pm1p  = cnpi(0,1,0)
+        C22apx45x12pm1p = cnpi(0,0,2)
+        C22ax45px12pm1p = cnpi(0,2,0)
+
+        call C_cll(cnpi,cnpiuv,mp2*c1,x12*c1,x35*c1,mq*c1,
+     >       mp2*c1,mp2*c1,2)
+        C0ax35x12pm1pp  = cnpi(0,0,0)
+        C1apx12x35m1pp  = cnpi(0,1,0)
+        C1ax35x12pm1pp  = cnpi(0,0,1)
+        C00ax35x12pm1pp = cnpi(1,0,0)
+        C11apx12x35m1pp = cnpi(0,2,0)
+        C00apx12x35m1pp = cnpi(1,0,0)
+        C12apx12x35m1pp = cnpi(0,1,1)
+        C12ax35x12pm1pp = cnpi(0,1,1)
+        C11ax35x12pm1pp = cnpi(0,0,2)
+!!!!!!!!!!!For simmetry of PaVe                                                                                                                                                                               
+        C0apx35x12pm1p  = C0ax35x12pm1pp
+        c0apx12x35m1pp  = C0ax35x12pm1pp
+        C2apx35x12pm1p  = cnpi(0,0,1)
+        C00apx35x12pm1p = cnpi(1,0,0)
+        C2ax35px12pm1p  = cnpi(0,1,0)
+        C22apx35x12pm1p = cnpi(0,0,2)
+        C22ax35px12pm1p = cnpi(0,2,0)
+        C12ax35x12pm1pp = cnpi(0,1,1)
+
+        call C_cll(cnpi,cnpiuv,x12*c1,x34*c1,0.d0*c1,
+     >       mp2*c1,mp2*c1,mp2*c1,2)
+
+        C1ax12x340ppp  = cnpi(0,1,0)
+        C11ax12x340ppp = cnpi(0,2,0)
+        C12a0x34x12ppp = cnpi(0,1,1)
+
+        call C_cll(cnpi,cnpiuv,0.d0*c1,x12*c1,x34*c1,
+     >	     mp2*c1,mp2*c1,mp2*c1,2)
+        C00a0x12x34ppp = cnpi(1,0,0)
+        C12a0x12x34ppp = cnpi(0,1,1)
+
+        call D_cll(dnpi,dnpiuv,mp2*c1,0.d0*c1,x12*c1,mp2*c1,
+     >       x35*c1,x34*c1,mq*c1,mp2*c1,mp2*c1,mp2*c1,2)
+
+        D0ap0x12px35x34m1ppp  = dnpi(0,0,0,0)
+        D1ap0x12px35x34m1ppp  = dnpi(0,1,0,0)
+        D2ap0x12px35x34m1ppp  = dnpi(0,0,1,0)
+        D3ap0x12px35x34m1ppp  = dnpi(0,0,0,1)
+        D00ap0x12px35x34m1ppp = dnpi(1,0,0,0)
+        D11ap0x12px35x34m1ppp = dnpi(0,2,0,0)
+        D12ap0x12px35x34m1ppp = dnpi(0,1,1,0)
+        D13ap0x12px35x34m1ppp = dnpi(0,1,0,1)
+        D22ap0x12px35x34m1ppp = dnpi(0,0,2,0)
+        D23ap0x12px35x34m1ppp = dnpi(0,0,1,1)
+        D33ap0x12px35x34m1ppp = dnpi(0,0,0,2)
+
+        call D_cll(dnpi,dnpiuv,mp2*c1,0.d0*c1,x12*c1,mp2*c1,
+     >       x45*c1,x34*c1,mq*c1,mp2*c1,mp2*c1,mp2*c1,2)
+
+        D0ap0x12px45x34m1ppp  = dnpi(0,0,0,0)
+        D1ap0x12px45x34m1ppp  = dnpi(0,1,0,0)
+        D2ap0x12px45x34m1ppp  = dnpi(0,0,1,0)
+        D3ap0x12px45x34m1ppp  = dnpi(0,0,0,1)
+        D00ap0x12px45x34m1ppp = dnpi(1,0,0,0)
+        D11ap0x12px45x34m1ppp = dnpi(0,2,0,0)
+        D12ap0x12px45x34m1ppp = dnpi(0,1,1,0)
+        D13ap0x12px45x34m1ppp = dnpi(0,1,0,1)
+        D22ap0x12px45x34m1ppp = dnpi(0,0,2,0)
+        D23ap0x12px45x34m1ppp = dnpi(0,0,1,1)
+        D33ap0x12px45x34m1ppp = dnpi(0,0,0,2)
+
+#endif
+        
+                     
+        include 'pipirad/gvmd/purefsrtot_isr.f'
+
+        if(ifisrfsr.eq.11) then
+           
+           virtual = elmat1*ffpifs*CONJG(ffpiis)
+
+        elseif(ifisrfsr.eq.01) then
+
+           virtual = (0.q0,0.q0)
+
+        endif
+
+        
+        include 'pipirad/gvmd/purefsrtot_fsr.f'
+                
+        virtual = virtual + elmat2*ffpifs2
+!        print*,'PURE FSR NO CT',virtual
+
+
+***************CT_s factorise over born (ISR), so here we have (|M_FSR^0|^2+M_FSR^0 x M_ISR^{0,\dagger})*dzphi****
+******************************************************************************************************************
+***************REMARK: THE CT_S FOR THE POINT LIKE PART ARE EVALUATED IN CT_PR EXPLOITING THE EXISTING************
+******************************************POINTLIKE CALCULATION***************************************************        
+
+        call FSR_pr(p1,p2,p3,p4,q,elmatfsrd,qph)
+
+        call IFI_pr(p1,p2,p3,p4,q,elmatifid,qph)
+
+        dzphi = (2.q0*B0appm1+(4.q0*mp2-mq)*DB0apm1p)
+
+**************TO MATCH THE FACTOR IN LOOPS
+        dzphi  = dzphi/(4.q0*e6)
+*****************************************
+        dmpi=-(2.q0*A0am1-A0ap+(4.q0*mp2-mq)*B0appm1)/mp2
+           
+         
+*************THE IFI GIVES M_ISR*M_FSR^dagger, here i need its c.c.***********************************************
+*************IN THE PT.LIKE THIS WAS NOT NEEDED SINCE CT_S WERE REAL*********************************************
+
+        if(ifisrfsr.eq.11) then
+           
+           virtual = virtual
+     >          +dzphi*(elmatfsrd*1.q0+CONJG(elmatifid)*1.q0)
+        elseif(ifisrfsr.eq.01) then
+
+           virtual = virtual + dzphi*elmatfsrd*1.q0
+
+        endif
+
+
+        include 'pipirad/Virtual/CT/CTmpiISR.F'
+	include 'pipirad/Virtual/CT/CTmpiFSR.F'
+	
+	if(ifisrfsr.eq.01) then		
+           virtual=virtual+elmat1*ffpifs2
+	elseif(ifisrfsr.eq.11) then	
+           
+           virtual=virtual+elmat2*ffpifs*CONJG(ffpiis)
+     >          +elmat1*ffpifs2	
+	endif
+        
+#ifdef LOOPTOOLS
+        call clearcache
+#endif
+
+        return
+        end
+
 
       subroutine virtualMixedFSR_pr(p1,p2,p3,p4,q,virtual,qph)
 #ifdef COLLIER
@@ -6563,16 +7267,21 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 #endif
 	implicit double complex (z)
 	double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
-	double precision qph(40,0:3)
+	double precision qph(40,0:3),kt(0:3)
 	double precision virtual,virtual1
+        double complex gvmd,gvmd1,gvmd2
+        Complex*32 gvmdq,gvmdq1,gvmdq2,mq,derampl
+        complex*32 gvmdq0,deltafsr,dfsr2
+        common/maxdiff/diffmc
+        real*16 diffm,diffmc
 	real*8 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
 	real*8 x12,x13,x14,x15,x23,x24,x25,x34,x35,x45
 	real*8 e2,e6,me2,me4,me6,mp2,mp4,mp6
 	double precision ame,ammu,convfac,alpha,pi,ame2,ampi2,ampi
 	common/parameters/ame,ammu,convfac,alpha,pi
         common/hparam/ampi
-	Complex*16 elmat1,elmat2,elmat3,elmat4,elmat5,elmat6,elmat
-
+	Complex*16 elmat2,elmat3,elmat4,elmat5,elmat6,elmat
+        Complex*32 elmat1
 	real*8 deltauv,lambda2,mu2dim,m2min
 	common/loop/deltauv,lambda2,mu2dim,m2min
 	common/softphotonmass/phmass
@@ -6582,7 +7291,8 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 	real*8 dot
 
         double complex vpolc,alphar
-
+        common/indexfsrdisp/iFSRdisp
+        integer iFSRdisp
         common/ialpharunning/iarun
         integer iarun
 **********FF
@@ -6594,8 +7304,29 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 	double precision ffpiis2
 	double complex ffpifs
 	double precision ffpifs2
+********FsQED
 
+        common/compotontensor/compttens
+        integer compttens
+        double precision spmin,spmax
+        double complex sp,ss
+        double precision wsp,wss
+        double complex dispsp,dispss
+        double complex ffpisp,ffpiss
 
+**********GVMD
+        integer i,j,k
+        double complex ct,im,cij
+        double precision m_n(1:9),g_n(1:9)
+        double complex m1,m2,m3
+        double complex a_n(1:9),lv2(1:9),lv2diff
+        common/par_gvmd/m_n,g_n,a_n
+
+        common/resonancesgvmd/nres
+        integer nres
+        
+	real*16 delta,delta1
+        parameter (delta = 1.q-10)
 
 *********CLL STUFF
 	double complex cnpi(0:0,0:1,0:1)
@@ -6617,7 +7348,11 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 	Complex*16 C0appx34p0p
 	Complex*16 C2appx34p0p
 
-****************
+**********GVMD 
+        Complex*16 A0am1,B0appm1,B0a0m1m1
+        Complex*16 B0ax34pp,C0appx34pm1p,C0appx34pm1pf
+        Complex*16 C0appx34pm1pb,C0a0ppm1m1p
+        Complex*16 D0a0px34pppm1m1pp
 
 	e2 = 4.d0*pi*alpha
 	e6 = e2*e2*e2
@@ -6651,7 +7386,7 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 	x34 = 2d0*ampi2+2d0*p3p4
 	x35 = ampi2+2d0*kp3
 	x45 = ampi2+2d0*kp4
-
+!        iffpi=0
 **************
 	ffpifs=(1.d0,0.d0)
 	ffpifs2=1.d0
@@ -6673,15 +7408,15 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 ****************
 
 #ifdef COLLIER
-
-!	call SetDeltaUV_cll(1000000d0)
+	call GetMuUV2_cll(mu2dim)
+        call GetDeltaUV_cll(deltauv)
+!     print*,'mu2dim',mu2dim
         call A0_cll(A0ap,a1*ampi2)
 
         call B0_cll(B0ap0p,b1*ampi2,b1*0d0,b1*ampi2)
 
         call C_cll(cnpi,cnpiuv,c1*ampi2,c1*ampi2,c1*x34,
      >       c1*ampi2,c1*0d0,c1*ampi2,1)
-
 		C0appx34p0p=cnpi(0,0,0)
 		C2appx34p0p=cnpi(0,0,1)
 #endif
@@ -6692,28 +7427,314 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 
 **************************
 	virtual = real(elmat)*ffpiis2
-
-
 ****************(VIRTUALE FSR REALE ISR) CROSSATO CON BORN FSR
 
 	include 'pipirad/Virtual_new/mixedfsrisr_fsr.f'
 **************************
 
 	virtual=virtual+real(elmat*ffpiis*CONJG(ffpifs))
+!        print*,'POINTLIKE VIRTUAL',virtual
+***** ------------------------------_**********
+*******************GVMD***********************
+*****-------------------------------**********
 
+        if(iFSRdisp.eq.1) then
+           if(iffpi.eq.2) then
+!!!!! GIÀ DEFINITI COSÌ NEL FF,OSSIA A_N/CT
+              im=(0.d0,1.d0)           
+              do i=1,nres
+
+                 lv2(i) = m_n(i)**2 - im*m_n(i)*g_n(i)
+              enddo
+
+!!!!!!!!!!!!!!!NOW CALCULATION AS I IMPLEMENTED IT IN THE LATEX
+              do i=1,nres
+                 
+                 cij=-a_n(i)
+                 do k=1,nres
+                    
+                    if(k.ne.i) then
+                       cij = cij + 2.d0*a_n(k)*lv2(k)/(lv2(i)-lv2(k))
+                    endif
+                 enddo
+                 mq=lv2(i)*1.q0
+!!!!!!!!!!!!!!CENTRAL VALUE
+                 call mixedfsr_quad(p1,p2,p3,p4,q,mq,gvmdq,qph)
+!!!!!!!!!!!!!TO FIND DERIVATIVE
+                 
+                 call mixedfsr_quad(p1,p2,p3,p4,q,mq*(1.q0+1.q0*delta)
+     >                ,gvmdq1,qph)
+                 
+                 derampl=(gvmdq1-gvmdq)/(delta*mq)
+                 
+                 virtual=virtual+real(a_n(i)*cij*gvmdq)
+                 virtual=virtual+real(a_n(i)**2*lv2(i)*derampl)
+              enddo
+*---------------------------------------------
+*------------------FsQED----------------------
+*---------------------------------------------
+              
+           elseif(iffpi.eq.3) then
+              if(compttens.eq.3) then
+                 virtual=(0.d0,0.d0)
+              endif
+
+!--------QUI GENERO S' TRA 4*MP^2 E 9 GeV^2 (ASSUMIAMO VALIDO IL FF FINO A 3 GEV)------           
+              spmin = 4.d0*mp2
+              spmax = 9.d0
+              call sp_disp(spmin,spmax,sp,wsp)
+              call ffpi(real(sp),ffpisp,ffpifs2)
+              
+              call mixedfsr_disp(p1,p2,p3,p4,q,sp,dispsp,qph)
+
+              virtual=virtual-2.d0/pi*real(aimag(ffpisp)/sp*dispsp/wsp)
+
+!--------QUI IL DOPPIO DISPERSIVO
+              
+              call sp_disp(spmin,spmax,ss,wss)
+              call ffpi(real(ss),ffpiss,ffpifs2)
+              
+              call mixedfsr_disp(p1,p2,p3,p4,q,ss,dispss,qph)
+
+              
+!-------Se |s'-s''|/s'<10^-2 il rapporto in doppia potrebbe diventare instabile--------!
+!-------quindi switcho in 4-pla precisione per calcolare il ratio----------------------!
+              if(abs((sp-ss)/sp).ge.1d-5) then
+
+                 virtual=virtual+1.d0/(pi**2)*
+     >                real(aimag(ffpiss)/ss/wss
+     >                *aimag(ffpisp)/sp/wsp*
+     >                1.d0/(ss-sp)*(dispss*ss-dispsp*sp))
+              else
+                 
+                 call mixedfsr_quad(p1,p2,p3,p4,q,sp*1.q0,gvmdq,qph)
+                 call mixedfsr_quad(p1,p2,p3,p4,q,ss*1.q0,gvmdq1,qph)
+
+                 derampl=(gvmdq1*ss*1.q0-gvmdq*sp*1.q0)
+     >                /(ss*1.q0-sp*1.q0)
+                 
+                 virtual=virtual+1.d0/(pi**2)*
+     >                real(aimag(ffpiss)/ss/wss
+     >                *aimag(ffpisp)/sp/wsp*derampl)
+
+              endif
+           endif
+        endif
+!     print*,'post first contrib',virtual
 	virtual=4d0*virtual*e6*alpha/(2d0*pi)
 
 	end
-*****************************************
+     
 
-      subroutine virtualIFI_triang_pr(p1,p2,p3,p4,q,virtual,qph)
+      subroutine mixedfsr_disp(p1,p2,p3,p4,q,mq,virtual,qph)
+#ifdef COLLIER 
+        use collier
+#endif
+        implicit complex*16 (z)
+	double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
+	double precision pt1(0:3),pt2(0:3),pt3(0:3),pt4(0:3),qt(0:3)
+	double precision qph(40,0:3)
+	double precision virtual1
+
+        real*16 p1q(0:3),p2q(0:3),p3q(0:3),p4q(0:3),qq(0:3)
+        complex*16 m1,re,mq,dzphi,m12
+        complex*16 virtual,virtualf,deltafsr
+	complex*16 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
+ 	complex*16 e2,e6,x12,x13,x14,x15,x23,x24,x25,x34,x35,x45
+        complex*16 ame2,ammu2,me2,me4,mp2,mp4,ampi2,mp6,me6
+        real*16 zdeltauv,zphmass2,zmu2dim
+        common/hparam/ampi
+	double precision ame,ammu,convfac,alpha,pi,s,s1,ampi
+	common/parameters/ame,ammu,convfac,alpha,pi
+
+	external qdot
+        external dotq
+        real*16 dotq,qdot
+        
+        real*8 elmatisrd
+        complex*16 elmatifid
+	complex*32 elmat,elmat1,elmat2,elmati,elmatf
+	character*2 fs
+	character*3 ifc
+	common/finalstate/fs
+	
+	real*8 deltauv,lambda2,mu2dim,m2min
+	common/loop/deltauv,lambda2,mu2dim,m2min
+
+	double complex masses(0:4)
+	double complex mominv(1:10)
+	double complex momvec(0:3,4)
+
+	integer ier
+c	double precision routing(5), average
+	double complex routing(5), average
+	
+
+        external vpolc
+        double complex vpolc,alphar
+        
+        common/ialpharunning/iarun 
+        integer iarun 	
+        
+	integer i
+
+        common/lt/ltint,quadevents,ilt
+        integer ltint,quadevents,ilt
+        
+	common/softphotonmass/phmass
+	real*8 phmass
+
+	external dot
+	double precision dot
+
+**********FF
+
+	integer iffpi
+	character*10 what_ffpi
+	common/ffpioption/iffpi,what_ffpi
+	double complex ffpiis
+	double precision ffpiis2
+	double complex ffpifs
+	double precision ffpifs2
+
+        common/checkform/intltgvmd
+        integer intltgvmd
+        common/gvmdchecks/iscoll,fscoll
+        integer iscoll,fscoll
+**********LOOP FUNCTIONS
+        Complex*16 A0ap,A0am1,B0appm1
+        Complex*16 B0ax34pp,C0appx34pm1p
+        Complex*16 DB0apm1p
+	double complex c1
+	parameter (c1 = (1.d0,0.d0))
+
+        re =(1.q0,0.q0)
+        
+	e2 = 4.d0*pi*alpha
+	e6 = e2*e2*e2
+	ame2=(ame*1.q0)*(ame*1.q0)*re
+	ampi2=(ampi*1.q0)*(ampi*1.q0)*re
+        me2=ame2*re
+        mp2=ampi2*re
+        me4=me2**2*re
+        me6=me2**3*re
+        mp4=mp2**2*re
+        mp6=mp2**3*re
+
+        pt3=p3
+        pt4=p4
+
+        
+        call shellquad(p1,p2,p3,p4,q,p1q,p2q,p3q,p4q,qq)
+        
+        p1p2 = qdot(p1q,p2q)*re
+        p1p3 = qdot(p1q,p3q)*re
+        p1p4 = qdot(p1q,p4q)*re
+	kp1  = qdot(p1q,qq)*re
+        p2p3 = qdot(p2q,p3q)*re
+	p2p4 = qdot(p2q,p4q)*re
+        kp2  = qdot(p2q,qq)*re
+        kp3  = qdot(p3q,qq)*re
+	p3p4 = qdot(p3q,p4q)*re
+	kp4  = qdot(p4q,qq)*re
+
+        x12 = qdot(p1q+p2q,p1q+p2q)*re
+	x13 = qdot(p1q-p3q,p1q-p3q)*re
+	x14 = qdot(p1q-p4q,p1q-p4q)*re
+	x15 = qdot(p1q-qq,p1q-qq)*re
+        x23 = qdot(p2q-p3q,p2q-p3q)*re
+        x24 = qdot(p2q-p4q,p2q-p4q)*re
+	x25 = qdot(p2q-qq,p2q-qq)*re
+        x34 = qdot(p3q+p4q,p3q+p4q)*re
+        x35 = qdot(p3q+qq,p3q+qq)*re
+        x45 = qdot(p4q+qq,p4q+qq)*re
+
+**************
+	ffpifs=(1.d0,0.d0)
+	ffpifs2=1.d0
+        
+	ffpiis=(1.d0,0.d0)
+	ffpiis2=1.d0
+	s=2.d0*(ame**2+p1p2)
+	s1=2.d0*(ampi**2+p3p4)
+	if(iffpi.gt.0) then
+
+		call ffpi(s,ffpifs,ffpifs2) 
+		call ffpi(s1,ffpiis,ffpiis2)
+	        
+	endif	
+
+******ALPHA RUNNING	
+	ffpiis=ffpiis*vpolc(s1)
+	ffpiis2=ffpiis*CONJG(ffpiis)
+	
+	ffpifs=ffpifs*vpolc(s)
+	ffpifs2=ffpifs*CONJG(ffpifs)
+****************
+!        print*,'deltauv',deltauv
+
+        m1       = sqrt(mq)
+        m12      = mq
+        virtual  = (0.q0,0.q0)
+#ifdef COLLIER
+        call A0_cll(A0ap,mp2*c1)
+        
+        call A0_cll(A0am1,mq*c1)
+
+        call B0_cll(B0ax34pp,x34*c1,mp2*c1,mp2*c1)
+
+        call B0_cll(B0appm1,mp2*c1,mp2*c1,mq*c1)
+
+        call DB0_cll(DB0apm1p,mp2*c1,mq*c1,mp2*c1)
+
+        call C0_cll(C0appx34pm1p,mp2*c1,mp2*c1,x34*c1,
+     >       mp2*c1,mq*c1,mp2*c1)
+
+#endif
+
+       
+        include 'pipirad/gvmd/mixedfsrisrtot_isr.f'
+        
+        virtual = elmat1*ffpiis2
+
+        include 'pipirad/gvmd/mixedfsrisrtot_fsr.f'
+        
+        virtual=virtual+elmat2*ffpiis*CONJG(ffpifs)
+
+        
+***************CT_s factorise over born (ISR), so here we have (|M_ISR^0|^2+M_ISR^0 x M_FSR^{0,\dagger})*dzphi****
+******************************************************************************************************************
+***************REMARK: THE CT_S FOR THE POINT LIKE PART ARE EVALUATED IN CT_PR EXPLOITING THE EXISTING************
+******************************************POINTLIKE CALCULATION***************************************************        
+
+        call ISR_pr(p1,p2,p3,p4,q,elmatisrd,qph)
+
+        call IFI_pr(p1,p2,p3,p4,q,elmatifid,qph)
+
+        
+        dzphi = (2.q0*B0appm1+(4.q0*mp2-mq)*DB0apm1p)
+
+**************TO MATCH THE FACTOR IN LOOPS
+        dzphi  = dzphi/(4.q0*e6)
+*****************************************
+        virtual = virtual +dzphi*(elmatisrd*1.q0+elmatifid*1.q0)
+
+        return
+        end
+
+
+      subroutine virtualIFI_triang_pr(p1,p2,p3,p4,q,virtualc,qph)
 #ifdef COLLIER
         use collier
 #endif
 	implicit double complex (z)
+!     implicit none
+        character*2 fs
+        common/finalstate/fs
 	double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
 	double precision qph(40,0:3)
-	double precision virtual
+	double precision virtual,virtual22
+        double complex virtualc
 	real*8 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
 	real*8 x12,x13,x14,x15,x23,x24,x25,x34,x35,x45
 	real*8 e2,e6,me2,me4,me6,mp2,mp4,mp6
@@ -6744,8 +7765,15 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 	double complex ffpifs
 	double precision ffpifs2
 
+        common/epssoft/eps
+        real*8 eps
 
+      	external aintsv_pions
+        real*8 a,aintsv_pions
 *********CLL STUFF
+	double complex dnpi(0:1,0:2,0:2,0:2)
+	double complex dnpiuv(0:1,0:2,0:2,0:2)
+
 	double complex cnpi(0:0,0:1,0:1)
 	double complex cnpiuv(0:0,0:1,0:1)
 
@@ -6773,6 +7801,22 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 
 ****************
 
+        complex*32  box13
+        double complex C0ax15ex34m1em2
+        double complex D0aex15ex250x34em1em2
+        double complex D1aex15ex250x34em1em2
+        double complex D3aex15ex250x34em1em2
+        double complex D00aex15ex250x34em1em2
+        double complex D11aex15ex250x34em1em2
+        double complex D12aex15ex250x34em1em2
+        double complex D13aex15ex250x34em1em2
+        double complex D23aex15ex250x34em1em2
+        double complex D33aex15ex250x34em1em2
+
+        double complex m12,m22
+        m12=0.d0
+        m22=0.d0
+        
 	e2 = 4.d0*pi*alpha
 	e6 = e2*e2*e2
 	ame2=ame*ame
@@ -6851,6 +7895,25 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 		C0aex12ee00=cnpi(0,0,0)
 		C1aex12ee00=cnpi(0,1,0)
 		C0aeex120e0=cnpi(0,0,0)
+
+
+*******BOX
+             
+        call C0_cll(C0ax15ex34m1em2,c1*x15,c1*ame2,c1*x34,
+     >       c1*m12,c1*ame2,c1*m22)
+       
+        call D_cll(dnpi,dnpiuv,c1*ame2,c1*x15,c1*ame2,c1*x25,
+     >   c1*0.d0,c1*x34,c1*ame2,c1*m12,c1*ame2,c1*m22,2) 
+        D0aex15ex250x34em1em2  = dnpi(0,0,0,0)
+        D1aex15ex250x34em1em2  = dnpi(0,1,0,0)
+        D3aex15ex250x34em1em2  = dnpi(0,0,0,1)
+        D00aex15ex250x34em1em2 = dnpi(1,0,0,0)
+        D11aex15ex250x34em1em2 = dnpi(0,2,0,0)
+        D12aex15ex250x34em1em2 = dnpi(0,1,1,0)
+        D13aex15ex250x34em1em2 = dnpi(0,1,0,1)
+        D23aex15ex250x34em1em2 = dnpi(0,0,1,1)
+        D33aex15ex250x34em1em2 = dnpi(0,0,0,2)
+
 #endif
 
 **************** CROSSATO CON BORN ISR
@@ -6858,23 +7921,25 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 	include 'pipirad/Virtual_new/triangisr.f'
 **************************
 
-	virtual=real(elmat1*CONJG(ffpiis)*ffpifs)+
-     >		real(elmat2)*ffpiis2
+	virtualc=elmat1*CONJG(ffpiis)*ffpifs+ 
+     >		elmat2*ffpiis2
 
 **************** CROSSATO CON BORN FSR
 
 	include 'pipirad/Virtual_new/triangfsr.f'
 **************************
 
-	virtual=virtual+real(elmat1)*ffpifs2
-     >	 	       +real((elmat2)*(ffpiis*CONJG(ffpifs)))
+	virtualc=virtualc+elmat1*ffpifs2
+     >	 	       +(elmat2)*(ffpiis*CONJG(ffpifs))
 
-	virtual=4d0*virtual*e6*alpha/(2d0*pi)
 
+	virtualc=4d0*virtualc*e6*alpha/(2d0*pi)
+!
+!        print*,'VIRTUALE PTLIKE TRIANG',virtual
 	end
 ****************************
 
-      subroutine virtualIFI_Boxes_pr(p1,p2,p3,p4,q,virtual,qph)
+      subroutine virtualIFI_Boxes_pr(p1,p2,p3,p4,q,virtualc,qph)
 #ifdef COLLIER
         use collier
 #endif
@@ -6882,6 +7947,7 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 	double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
 	double precision qph(40,0:3)
 	double precision virtual
+        double complex virtualc
 	real*8 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
 	real*8 x12,x13,x14,x15,x23,x24,x25,x34,x35,x45
 	real*8 e2,e6,me2,me4,me6,mp2,mp4,mp6
@@ -7211,8 +8277,7 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 
 	include 'pipirad/Virtual_new/boxisr.f'
 !**************************
-	virtual=real(elmat1*CONJG(ffpiis)*ffpifs)+real(elmat2)*ffpiis2
-
+	virtualc=elmat1*CONJG(ffpiis)*ffpifs+elmat2*ffpiis2
 
 **************** CROSSATO CON BORN FSR
 
@@ -7220,11 +8285,13 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 
 ********************
 
-	virtual=virtual+real(elmat1)*ffpifs2+
-     >		real(elmat2*ffpiis*CONJG(ffpifs))
+	virtualc=virtualc+elmat1*ffpifs2+
+     >		elmat2*ffpiis*CONJG(ffpifs)	
 
-	virtual=4d0*virtual*e6*alpha/(2d0*pi)
 
+	virtualc=4d0*virtualc*e6*alpha/(2d0*pi)
+
+!        print*,'VIRTUAL PTLIKE',virtual
 	end
 
 *********************
@@ -7237,7 +8304,7 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 	double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
 	double precision pt1(0:3),pt2(0:3),pt3(0:3),pt4(0:3),qt(0:3)
 	double precision qph(40,0:3)
-	double precision virtual
+	double complex virtual
 	real*8 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
 	real*8 x12,x13,x14,x15,x23,x24,x25,x34,x35,x45,p1km1,p2km1
 	real*8 e2,e6,me2,me4,me6,mp2,mp4,mp6
@@ -7268,9 +8335,9 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 	integer iffpi
 	character*10 what_ffpi
 	common/ffpioption/iffpi,what_ffpi
-	double complex ffpiis
+	double complex ffpiis,Cffpiis
 	double precision ffpiis2
-	double complex ffpifs
+	double complex ffpifs,Cffpifs
 	double precision ffpifs2
 
 
@@ -7338,7 +8405,10 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 	Complex*16 D1apx250x23x14ep0ee
 	Complex*16 D1a0x23px25x14eeep0
 ********************
-
+*************GVMD COMMON
+        common/gvmdrad/indexnores
+        integer indexnores
+!        indexnores = 0
 
 	e2 = 4.d0*pi*alpha
 	e6 = e2*e2*e2
@@ -7386,16 +8456,33 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 		call ffpi(2.d0*(ame**2+p1p2),ffpifs,ffpifs2)
 		call ffpi(2.d0*(ampi**2+p3p4),ffpiis,ffpiis2)
 
+	endif	
+
+        Cffpiis=CONJG(ffpiis)
+        Cffpifs=CONJG(ffpifs)
+
+        if(indexnores.eq.1) then
+           ffpiis=(1.d0,0.d0)
+           ffpifs=(1.d0,0.d0)
 	endif
 
 ******ALPHA RUNNING
 	ffpiis=ffpiis*vpolc(2.d0*(ampi**2+p3p4))
-	ffpiis2=ffpiis*CONJG(ffpiis)
+        Cffpiis=Cffpiis*CONJG(vpolc(2.d0*(ampi**2+p3p4)))
 
 	ffpifs=ffpifs*vpolc(2.d0*(ame**2+p1p2))
-	ffpifs2=ffpifs*CONJG(ffpifs)
+        Cffpifs=Cffpifs*CONJG(vpolc(2.d0*(ame**2+p1p2)))
+        
+        ffpiis2=ffpiis*Cffpiis
+        ffpifs2=ffpifs*Cffpifs
 ****************
-
+c$$$
+c$$$	print*,ffpiis
+c$$$        print*,ffpifs
+c$$$        print*,Cffpiis
+c$$$        print*,Cffpifs
+c$$$        print*,ffpifs2
+c$$$        print*,ffpiis2
 !*********PENTAGONS WITH PHOTON ATTACHED TO FS
 #ifdef COLLIER
 
@@ -7426,20 +8513,21 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 ****************DIAGRAMMA 1
  include 'pipirad/Virtual_new/pent1_4pt.f'
 
- 	elmati=real(elmat1*CONJG(ffpiis)*ffpifs)
- 	elmatf=elmat2*ffpifs2
+ 	elmati=elmat1*Cffpiis*ffpifs
+ 	elmatf=elmat2*ffpifs*Cffpifs
 
- 	virtual=real(elmati+elmatf)
+ 	virtual=elmati+elmatf
 
 ****************DIAGRAMMA 2
 
  include 'pipirad/Virtual_new/pent2_4pt.f'
 
- 	elmati=real(elmat1*CONJG(ffpiis)*ffpifs)
+ 	elmati=elmat1*Cffpiis*ffpifs
 
- 	elmatf=elmat2*ffpifs2
+ 	elmatf=elmat2*ffpifs*Cffpifs
 
- 	virtual=virtual+real(elmati+elmatf)
+ 	virtual=virtual+elmati+elmatf
+!        print*,'virtual 12',virtual
         virtual=0.d0
 #ifdef COLLIER
 	call C0_cll(C0a0x25eee0,d1*0d0,d1*x25,d1*ame2,d1*ame2,
@@ -7502,18 +8590,23 @@ C CON IL BORN FSR, POI PER SIMMETRIA PORTO TUTTO QUESTO AL SIMMETRICO, OSSIA VIR
 ****************DIAGRAMMA 3
  include 'pipirad/Virtual_new/pent3_4pt.f'
 
- 	elmati=real(elmat1)*ffpiis2
- 	elmatf=REAL(elmat2*CONJG(ffpifs)*ffpiis)
- 	virtual=virtual+real(elmati+elmatf)
+c$$$      print*,elmat1
+c$$$      print*,elmat2
+ 	elmati=elmat1*ffpiis*Cffpiis
+ 	elmatf=elmat2*Cffpifs*ffpiis
+ 	virtual=virtual+elmati+elmatf
 c$$$        print*,'diag3',elmati,elmatf
 ****************DIAGRAMMA 4
 
  include 'pipirad/Virtual_new/pent4_4pt.f'
 
- 	elmati=real(elmat1)*ffpiis2
- 	elmatf=REAL(elmat2*CONJG(ffpifs)*ffpiis)
- 	virtual=virtual+real(elmati+elmatf)
+c$$$      print*,elmat1
+c$$$      print*,elmat2
+ 	elmati=elmat1*ffpiis*Cffpiis
+ 	elmatf=elmat2*Cffpifs*ffpiis
+ 	virtual=virtual+elmati+elmatf
 c$$$ 	print*,'diag4',elmati,elmatf
+!        print*,'virtual fin',virtual
 	virtual=4d0*virtual*e6*alpha/(2d0*pi)
 c$$$
 c$$$        if(instabilities.eq.1) then
@@ -7556,8 +8649,11 @@ c$$$           endif
 	implicit none
 	double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
 	double precision pt1(0:3),pt2(0:3),pt3(0:3),pt4(0:3),qt(0:3)
-	double precision qph(40,0:3),routing1(5),routing2(5)
-	double precision virtual
+c	double precision qph(40,0:3),routing1(5),routing2(5)
+	double precision qph(40,0:3)
+        double complex routing1(5),routing2(5)
+
+	double complex virtual
 	real*8 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
 	real*8 x12,x13,x14,x15,x23,x24,x25,x34,x35,x45
 	real*8 e2,e6
@@ -7802,7 +8898,7 @@ c$$$        call find_closest_two(routing2,elmat2)
         endif
 c$$$        print*,'fsr',routing1
 c$$$        print*,'fsr',routing2
-        virtual=real(elmat1+elmat2)
+        virtual=elmat1+elmat2
 
 ***********NOW WE EVAUALATE THE TWO ISR PENTAGONS
         if(ltint.eq.0) then
@@ -8008,9 +9104,86 @@ c$$$	endif
    	if(i.eq.2) then
      		elmat1=-elmat1
 	endif
-	virtual=virtual+real(elmat1+elmat2)
+	virtual=virtual+elmat1+elmat2
         endif
 	virtual=4d0*virtual*e6*alpha/(2d0*pi)
+	end
+
+c$$$  **************
+c$$$
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!ROUTINE FOR FULL PENTAGON !!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!      
+
+      subroutine VirtualIFI_Pent(pin1,pin2,p1,p2,q,virtual1,qphmat) 
+#ifdef COLLIER
+      use collier
+#endif
+      implicit none
+      double complex virtual1,virtual,virtualpent,emtx
+      double precision pin1(0:3),pin2(0:3),p1(0:3),p2(0:3),q(0:3)
+      double precision qphmat(40,0:3)
+      integer iffpi
+      character*10 what_ffpi
+      real*8 s_max
+      common/ffpioption/iffpi,what_ffpi
+      double complex ffpis
+      double precision ffpis2,s
+
+      external dot
+      double precision dot
+      common/resonancesgvmd/nres
+      integer nres
+      integer igvmdwarning
+      data igvmdwarning /0/
+      
+      common/ialpharunning/iarun 
+      integer iarun,iarunbck
+      
+      common/radoption/ifisrfsr
+      integer ifisrfsr  
+
+      common/instabilities/instabilities
+      integer instabilities
+      common/lt/ltint,quadevents,ilt
+      integer ltint,quadevents,ilt
+
+      double precision eikfull
+      complex*32 quademtx
+            
+
+      virtual1=0.d0
+      if(ltint.eq.0) then
+         call virtualIFI_Pent_4pt_pr(pin1,pin2,p1,p2,q,
+     >        virtual,qphmat)
+         virtual1=virtual1+virtual
+      endif
+!       print*,virtual
+      if(ltint.eq.1) then
+
+         call virtualPent_pr_quad(pin1,pin2,p1,p2,q,
+     >        virtual,qphmat,1)
+!          print*,virtual
+         virtual1=virtual1+virtual
+
+         call virtualPent_pr_quad(pin1,pin2,p1,p2,q,
+     >        virtual,qphmat,2)
+!          print*,virtual
+         virtual1=virtual1+virtual
+         
+      endif
+      
+      call virtualIFI_Pent_5pt_pr(pin1,pin2,p1,p2,q,
+     >     virtual,qphmat,1)  
+!       print*,virtual
+      virtual1=virtual1+virtual
+      call virtualIFI_Pent_5pt_pr(pin1,pin2,p1,p2,q,
+     >     virtual,qphmat,2)
+!       print*,virtual
+      if(ltint.eq.1) ltint=0
+
+      virtual1= virtual1+virtual
 	end
 **************
 
@@ -8028,8 +9201,8 @@ c$$$	endif
 	double precision ame,ammu,convfac,alpha,pi,ame2,ampi2,ampi
 	common/parameters/ame,ammu,convfac,alpha,pi
         common/hparam/ampi
-	Complex*16 elmat1,elmat2,elmat3,born
-
+	complex*16 elmat2,born
+        double precision elmat1,elmat3
 	real*8 deltauv,lambda2,mu2dim,m2min
 	common/loop/deltauv,lambda2,mu2dim,m2min
 	common/softphotonmass/phmass
@@ -8235,9 +9408,23 @@ c$$$	endif
       use collier
 #endif
       implicit none
-      double precision virtual1,virtual,virtualpent
+      double precision virtual1,virtual,virtualpent,emtx
+      double complex virtualc,virtualtbp
       double precision pin1(0:3),pin2(0:3),p1(0:3),p2(0:3),q(0:3)
       double precision qphmat(40,0:3)
+      integer iffpi
+      character*10 what_ffpi
+      real*8 s_max
+      common/ffpioption/iffpi,what_ffpi
+      double complex ffpis
+      double precision ffpis2,s
+
+      external dot
+      double precision dot
+      common/resonancesgvmd/nres
+      integer nres
+      integer igvmdwarning
+      data igvmdwarning /0/
 
 	common/ialpharunning/iarun
         integer iarun,iarunbck
@@ -8250,71 +9437,2860 @@ c$$$	endif
         common/lt/ltint,quadevents,ilt
         integer ltint,quadevents,ilt
 
+      double precision eikfull
+      complex*32 quademtx
+
+      
+      common/colliermodedisp/initialisation
+      integer initialisation
+
+      common/compotontensor/compttens
+      integer compttens
+
+      double precision time1,time2
+      
+c$$$      if(initialisation.eq.0.and.iffpi.eq.1) then
+c$$$         call SetMode_cll(2)
+c$$$         initialisation=1
+c$$$      endif
 
         virtual1=0d0
-        virtualpent=0d0
 
+*--------------------------------------------*
+*     This first part is not dependent on    *
+*     the way the FF is introduced in the    *
+*                    loop                    *
+*--------------------------------------------*
 
 		call virtualISR_pr(pin1,pin2,p1,p2,q,
      >                                       virtual,qphmat)
-!     		print*,"emtx",virtual
      		virtual1=virtual1+virtual
+
      		call virtualMixedISR_pr(pin1,pin2,p1,p2,q,
      >                                       virtual,qphmat)
                          virtual1=virtual1+virtual
+!        print*,'AFTER ISR',virtual1
+*--------------------------------------------*
+*     This part depends on the way the FF    *
+*     is introduced in the loop, but since   *
+*     the loop is just on FS legs, the       *
+*     virtual GVMD amplitude can be written  *
+*     as the FxsQED+finite pieces, so we     *
+*     still call the old FxsQED routines     *
+*     and we evaluate finite pieces if       *
+*                  iffpi=2                   *
+*--------------------------------------------*
+!      if(compttens.eq.3) then
       		call virtualFSR_pr(pin1,pin2,p1,p2,q,
      >                                       virtual,qphmat)
+
                      virtual1=virtual1+virtual
      		call virtualMixedFSR_pr(pin1,pin2,p1,p2,q,
      >                                       virtual,qphmat)
                      virtual1=virtual1+virtual
+
+         call virtual_CT_pr(pin1,pin2,p1,p2,q,virtual,qphmat)
+         virtual1=virtual1+virtual
+
+!         print*,'AFTER FSR',virtual1
+!     return
+!      endif
+*--------------------------------------------*
+*     This part depends on the way the FF    *
+*     is introduced in the loop. In this     *
+*     case it is not true that the virtual   *
+*     GVMD amplitude can be written as the   *
+*     FxsQED+finite pieces, so we split      *
+*     the routines, the first are used for   *
+*     iffpi=1 (FxsQED), the latter for       *
+*              iffpi=2  (GVMD)               *
+*--------------------------------------------*
+!        virtual1=0d0
+         if(iffpi.eq.1.or.iffpi.eq.0) then
+
      		call virtualIFI_triang_pr(pin1,pin2,p1,p2,q,
-     >                                       virtual,qphmat)
-     		virtual1=virtual1+virtual
+     >          virtualc,qphmat) 
+           virtual1=virtual1+real(virtualc)
+
      		call virtualIFI_Boxes_pr(pin1,pin2,p1,p2,q,
-     >                                       virtual,qphmat)
-                     virtual1=virtual1+virtual
-                call virtual_CT_pr(pin1,pin2,p1,p2,q,virtual,qphmat)
+     >          virtualc,qphmat)
+           virtual1 = virtual1 + real(virtualc)
+
+           call VirtualIFI_Pent(pin1,pin2,p1,p2,q,virtualc,qphmat)
+           virtual1 = virtual1 + real(virtualc)
+
+        elseif(iffpi.eq.2) then
+
+           call virtualIFI_GVMD(pin1,pin2,p1,p2,q,virtual,qphmat)
                 virtual1=virtual1+virtual
 
-                if(ltint.eq.0) then
-                call virtualIFI_Pent_4pt_pr(pin1,pin2,p1,p2,q,
-     >                    virtual,qphmat)
+        elseif(iffpi.eq.3) then
 
-                     virtualpent=virtualpent+virtual
+           call virtualIFI_disp(pin1,pin2,p1,p2,q,virtual,qphmat)
                      virtual1=virtual1+virtual
                 endif
+!      print*,'after ifi',virtual1
+!        return
+        end
 
-                if(ltint.eq.1) then
-                   call virtualPent_pr_quad(pin1,pin2,p1,p2,q,
-     >                    virtual,qphmat,1)
-                    virtualpent=virtualpent+virtual
-                    virtual1=virtual1+virtual
-                 call virtualPent_pr_quad(pin1,pin2,p1,p2,q,
-     >                    virtual,qphmat,2)
-                    virtualpent=virtualpent+virtual
-                    virtual1=virtual1+virtual
+
+      !===================================================!
+      !  FsQED ROUTINES FOR IFI IN \PI\PI\GAMMA           !   MG 24/04/26
+      !===================================================!
+
+!===================================================!                                                                                         
+!  ROUTINE FOR IFI WITH MASSES M1,M2 IN \PI\PI\GAMMA!                                                                                         
+!===================================================!
+
+      subroutine virtualIFI_ij_Box_disp(p1,p2,p3,p4,m12,m22
+     >     ,q,elmatre,elmatim,qph,i)
+c     This routines if i=1 returns Re(elmat(l,m)) and Im(elmat(l,m))
+c     for l,m=1,2 that stands for IS,FS real photon in virtual-born
+c     If i=2 we're evaluating the Im \int ds' D0, for D0_s behaving as
+c     1/(s-eta) being eta=M_pp^2,s for IS and FS real photon
+c     in virtual diagram. In the latter case Re(elmat(l,m))==0
+c     If i=3 we're evaluating the Im(tilde{elmat(l,m)}) where
+c     tilde stands for the fact that the ImD0 is subtracted by the
+c     Im part behaving as in i=2
+c     No FF included in this routine. 
+#ifdef COLLIER 
+        use collier
+#endif
+	implicit double complex (z)
+!        implicit none
+        double complex m12,m22,m1,m2
+	double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
+        double precision p1t(0:3),p2t(0:3),p3t(0:3),p4t(0:3),qt(0:3)
+        double precision p1oz(0:3),p2oz(0:3),p3oz(0:3),p4oz(0:3)
+        double precision qoz(0:3)
+        double precision p1tz(0:3),p2tz(0:3),p3tz(0:3),p4tz(0:3)
+        double precision qtz(0:3)
+	double precision qph(40,0:3)
+	double complex virtual,virtualpent,virtualpent1
+        complex*32 virtual1,virtualq
+	real*8 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
+	real*8 x12,x13,x14,x15,x23,x24,x25,x34,x35,x45
+	real*8 ep2,ep3,e2,e6,me2,me4,me6,mp2,mp4,mp6
+        complex*32 me2q
+	double precision ame,ammu,convfac,alpha,pi,ame2,ampi2,ampi
+	common/parameters/ame,ammu,convfac,alpha,pi
+        common/hparam/ampi
+	Complex*16 elmat1,elmat2,elmat3,elmat4,elmat
+
+	real*8 deltauv,lambda2,mu2dim,m2min
+	common/loop/deltauv,lambda2,mu2dim,m2min
+	common/softphotonmass/phmass
+	real*8 phmass
+	
+	external dot
+	real*8 dot
+	
+        double complex vpolc,alphar
+        
+        common/ialpharunning/iarun 
+        integer iarun 	
+
+        
+        complex*16 D0md,re
+	complex*16 Dimd(3)
+        complex*16 Dijmd(7)
+        complex*16 E0md
+        complex*16 Eimd(4)
+        complex*16 Eijmd(11)
+        complex*32 D0mq,rq
+        complex*32 Dimq(3)
+        complex*32 Dijmq(7)
+        complex*16 C0md,C1md,C2md
+**********FF
+
+	integer iffpi
+	character*10 what_ffpi
+	common/ffpioption/iffpi,what_ffpi
+	double complex ffpiis
+	double precision ffpiis2
+	double complex ffpifs
+	double precision ffpifs2
+        integer i,k
+*************GVMD COMMON
+        common/gvmdrad/indexnores
+        integer indexnores
+        
+        common/gvmdchecks/iscoll,fscoll
+        integer iscoll,fscoll
+        common/checkform/intltgvmd
+        integer intltgvmd
+        
+        common/compotontensor/compttens
+        integer compttens
+*--------FsQED
+        real*8 oneoeps,mudimreg2,eulergamma
+        common/IRdimreg/oneoeps,mudimreg2,eulergamma
+        real*8 elmatre(2,2),elmatim(2,2)
+        real*8 elmatres(2,2),elmatims(2,2)
+        real*8 elmatresp(2,2),elmatimsp(2,2)
+        integer l,m
+        double complex setrez
+        common/dispisfs/onlyis,onlyfs
+        integer onlyis,onlyfs
+
+*********CLL STUFF
+        double complex cnpi(0:0,0:1,0:1)
+        double complex cnpiuv(0:0,0:1,0:1)
+        double complex dnpi(0:1,0:2,0:2,0:2)
+	double complex dnpiuv(0:1,0:2,0:2,0:2)
+        double complex enpi(0:1,0:2,0:2,0:2,0:2)
+        double complex enpiuv(0:1,0:2,0:2,0:2,0:2)
+	double complex c1
+	parameter (c1 = (1.d0,0.d0))
+
+**************  QUARTIC-VERTEX  PAVE *******************
+!!! DIAGRAMS 1-4 IFI_TRIANG AND DIAGRAM 13 IFI_BOXES !!!
+
+	double complex B0aeem1
+	double complex B0aeem2
+	double complex B0ax12m1m2
+	double complex B0ax15em1
+	double complex B0ax25em2
+	double complex C0aeex12m1em2
+	double complex C0aex15x34m2em1
+	double complex B0ax34m1m2
+	double complex C0aex25x34m1em2
+
+        double complex C0ax15ex34m1em2
+        double complex D0aex15ex250x34em1em2
+        double complex D1aex15ex250x34em1em2
+        double complex D3aex15ex250x34em1em2
+        double complex D00aex15ex250x34em1em2
+        double complex D11aex15ex250x34em1em2
+        double complex D12aex15ex250x34em1em2
+        double complex D13aex15ex250x34em1em2
+        double complex D23aex15ex250x34em1em2
+        double complex D33aex15ex250x34em1em2
+        
+**************  BOXES  PAVE *******************
+!!!!!!!!!! DIAGRAMS 1-12 IFI_BOXES !!!!!!!!!!!!
+        double complex C0ax12px45m2m1p
+        double complex D0aepx45ex13x12em1pm2
+        double complex D1aeex45px12x13m1em2p
+        double complex D2aepx45ex13x12em1pm2
+        double complex D3aepx45ex13x12em1pm2
+
+        double complex C0ax12px45m1m2p
+        double complex D0aex45pex23x12em1pm2
+        double complex D1aeepx45x12x23m1em2p
+        double complex D1aex45pex23x12em1pm2
+        double complex D2aex45pex23x12em1pm2
+
+        double complex C0ax12px35m2m1p
+        double complex D0aex12x35x14epem1m2p
+        double complex D1aeex35px12x14m1em2p
+        double complex D2aex12x35x14epem1m2p
+        double complex D3aex12x35x14epem1m2p
+
+        double complex C0ax12px35m1m2p
+        double complex D0aex12px24ex35em1m2p
+        double complex D1aeepx35x12x24m1em2p
+        double complex D1aex12px24ex35em1m2p
+        double complex D3aex12px24ex35em1m2p
+
+        double complex C0aex34x15em2m1
+        double complex C0appx34m2pm1
+        double complex C1apx34ppm1m2
+        double complex C1apx34ppm2m1
+        double complex D0ax15x34px23epem1m2p
+        double complex D1ax15x34px23epem1m2p
+        double complex D3ax15x34px23epem1m2p
+        double complex D1aex23px34px15m2epm1
+
+        double complex C0appx34m1pm2
+        double complex D0ax15x34px24epem1m2p
+        double complex D1aex24px34px15m2epm1
+        double complex D1ax15x34px24epem1m2p
+        double complex D3ax15x34px24epem1m2p
+
+        double complex C0aex34x25em1m2
+        double complex D0aex34px13x25pem1m2p
+        double complex D1aex13px34px25m1epm2
+        double complex D2aex34px13x25pem1m2p
+        double complex D3aex34px13x25pem1m2p
+
+        double complex D0aex34px14x25pem1m2p
+        double complex D1aex14px34px25m1epm2
+        double complex D2aex34px14x25pem1m2p
+        double complex D3aex34px14x25pem1m2p
+        
+        double complex C1apx35x12m1pm2
+
+        double complex C1apx35x12m2pm1
+
+        double complex C1apx45x12m1pm2
+        double complex D0aex12x45x13epem1m2p
+        double complex D2aex12x45x13epem1m2p
+        double complex D3aex12x45x13epem1m2p
+
+        double complex C1apx45x12m2pm1
+        double complex D0aex12px23ex45em1m2p
+        double complex D1aex12px23ex45em1m2p
+        double complex D3aex12px23ex45em1m2p
+
+        double complex m22bck
+        double complex C0aepx13em1p
+        double complex C0aex13x45m2ep
+        external Itot1ovsp_dimreg
+        real*8 Itot1ovsp_dimreg
+
+        external Itotspovsp_dimreg
+        real*8 Itotspovsp_dimreg
+        real*8 betap,cth,tridot
+        external tridot
+        common/momentadisp/momenta
+        double precision momenta(4,0:3)
+        
+#ifdef COLLIER
+        call GetDeltaUV_cll(deltauv)
+        call GetMuUV2_cll(mu2dim)
+        call GetMuIR2_cll(lambda2)
+#endif
+!     Initialise all loop functions to (0,0)
+        include 'pipirad/gvmd/initial_ifi.f'
+!     Get momenta p1,p2,p3,p4 in RF where \vec(p3+p4)=\vec(0) to use dispersive integral on IS radiation
+        call new_boost(p3+p4,p1,p1t,1)
+        call new_boost(p3+p4,p2,p2t,1)
+        call new_boost(p3+p4,p3,p3t,1)
+        call new_boost(p3+p4,p4,p4t,1)
+        call new_boost(p3+p4,q,qt,1)
+
+        momenta(1,:)=p1
+        momenta(2,:)=p2
+        momenta(3,:)=p3
+        momenta(4,:)=p4
+        
+        mudimreg2= mu2dim
+        eulergamma= 0.57721566490153286060d0
+        oneoeps= log(lambda2/mudimreg2) + eulergamma - log(4.d0*pi)
+                
+        re =(1.d0,0.d0)
+        virtual=(0.d0,0.d0)
+        e2 = 4.d0*pi*alpha
+	e6 = e2*e2*e2
+        ep2= 1.d0
+        ep3= 1.d0
+	ame2=ame*ame
+	ampi2=ampi*ampi
+        me2=ame2
+        mp2=ampi2
+        me4=me2**2
+        me6=me2**3
+        mp4=mp2**2
+        mp6=mp2**3
+
+        me2q = (ame*1.q0)*(ame*1.q0)
+	p1p2 = dot(p1,p2)
+	p1p3 = dot(p1,p3)
+	p1p4 = dot(p1,p4)
+	kp1  = dot(p1,q)
+	p2p3 = dot(p2,p3)
+	p2p4 = dot(p2,p4) 
+	kp2  = dot(p2,q)
+	kp3 = dot(p3,q)
+	p3p4 = dot(p3,p4)
+	kp4  = dot(p4,q)
+					
+	x12  = 2d0*ame2+2.d0*p1p2
+	x13  = ame2+ampi2-2.d0*p1p3
+	x14  = ame2+ampi2-2.d0*p1p4
+	x15  = ame2-2.d0*kp1
+	x23  = ame2+ampi2-2d0*p2p3
+	x24  = ame2+ampi2-2d0*p2p4
+	x25 = ame2-2d0*kp2
+	x34 = 2d0*ampi2+2d0*p3p4
+	x35 = ampi2+2d0*kp3
+	x45 = ampi2+2d0*kp4
+
+        m1  = sqrt(m12)
+        m2  = sqrt(m22)
+
+**************
+	ffpifs=(1.d0,0.d0)
+	ffpifs2=1.d0
+
+	ffpiis=(1.d0,0.d0)
+	ffpiis2=1.d0
+	if(iffpi.gt.0) then
+		call ffpi(2.d0*(ame**2+p1p2),ffpifs,ffpifs2) 
+		call ffpi(2.d0*(ampi**2+p3p4),ffpiis,ffpiis2)
 
                  endif
 
-               	call virtualIFI_Pent_5pt_pr(pin1,pin2,p1,p2,q,
-     >                                       virtual,qphmat,1)
+******ALPHA RUNNING	
+	ffpiis=ffpiis*vpolc(2.d0*(ampi**2+p3p4))
+	ffpiis2=ffpiis*CONJG(ffpiis)
 
-                     virtualpent=virtualpent+virtual
-                     virtual1=virtual1+virtual
-               	call virtualIFI_Pent_5pt_pr(pin1,pin2,p1,p2,q,
-     >                    virtual,qphmat,2)
+	ffpifs=ffpifs*vpolc(2.d0*(ame**2+p1p2))
+	ffpifs2=ffpifs*CONJG(ffpifs)
+****************
+        do l=1,2
+           do m=1,2
 
-                if(ltint.eq.1) ltint=0
+              elmatre(l,m)=0.d0
+              elmatim(l,m)=0.d0
+           enddo
+        enddo
 
-                     virtualpent=virtualpent+virtual
-                     virtual1=virtual1+virtual
-********CHECK PENTAGONI
+#ifdef COLLIER
 
+        call B0_cll(B0aeem1,c1*ame2,c1*ame2,c1*m12)
+
+        call B0_cll(B0aeem2,c1*ame2,c1*ame2,c1*m22)
+
+        call B0_cll(B0ax12m1m2,c1*x12,c1*m12,c1*m22)
+        
+        call B0_cll(B0ax15em1,c1*x15,c1*ame2,c1*m12)
+
+        call B0_cll(B0ax25em2,c1*x25,c1*ame2,c1*m22)
+
+        call B0_cll(B0ax34m1m2,c1*x34,c1*m12,c1*m22)
+        
+        call C0_cll(C0aeex12m1em2,c1*ame2,c1*ame2,c1*x12,
+     >       c1*m12,c1*ame2,c1*m22)
+
+        call C0_cll(C0aex15x34m2em1,c1*ame2,c1*x15,c1*x34,
+     >       c1*m22,c1*ame2,c1*m12)
+
+        call C0_cll(C0aex25x34m1em2,c1*ame2,c1*x25,c1*x34,
+     >       c1*m12,c1*ame2,c1*m22)
+
+        call C0_cll(C0ax15ex34m1em2,c1*x15,c1*ame2,c1*x34,
+     >       c1*m12,c1*ame2,c1*m22)
+
+        
+#endif
+        if(onlyis.eq.1) then
+           call Dij_d(-p1,-q,+p2-q,me2*re,m12,me2*re,
+     >          m22,D0md,Dimd,Dijmd)
+
+           D0aex15ex250x34em1em2   = D0md
+           D1aex15ex250x34em1em2   = Dimd(1)
+           D3aex15ex250x34em1em2   = Dimd(3)
+           D00aex15ex250x34em1em2  = Dijmd(1)
+           D11aex15ex250x34em1em2  = Dijmd(2)
+           D12aex15ex250x34em1em2  = Dijmd(3)
+           D13aex15ex250x34em1em2  = Dijmd(4)
+           D23aex15ex250x34em1em2  = Dijmd(6)
+           D33aex15ex250x34em1em2  = Dijmd(7)
+        endif
+!     Se i=3 voglio soltanto la parte immaginaria
+        if(i.eq.3) then
+           B0aeem1     = setrez(B0aeem1)
+           B0aeem2     = setrez(B0aeem2)
+           B0ax12m1m2  = setrez(B0ax12m1m2)
+           B0ax15em1   = setrez(B0ax15em1)
+           B0ax25em2   = setrez(B0ax25em2)
+           B0ax34m1m2  = setrez(B0ax34m1m2)
+           C0aeex12m1em2 = setrez(C0aeex12m1em2)
+           C0aex15x34m2em1 = setrez(C0aex15x34m2em1)
+           C0aex25x34m1em2 = setrez(C0aex25x34m1em2)
+           C0ax15ex34m1em2 = setrez(C0ax15ex34m1em2)
+           D0aex15ex250x34em1em2   = setrez(D0md)
+           D1aex15ex250x34em1em2   = setrez(Dimd(1))
+           D3aex15ex250x34em1em2   = setrez(Dimd(3))
+           D00aex15ex250x34em1em2  = setrez(Dijmd(1))
+           D11aex15ex250x34em1em2  = setrez(Dijmd(2))
+           D12aex15ex250x34em1em2  = setrez(Dijmd(3))
+           D13aex15ex250x34em1em2  = setrez(Dijmd(4))
+           D23aex15ex250x34em1em2  = setrez(Dijmd(6))
+           D33aex15ex250x34em1em2  = setrez(Dijmd(7))
+        endif
+*-----When ep2=1 & ep3=0 we're looking at virtual diagrams where the------
+*-----real photon is IS photon, when ep2=0 & ep3=1 the real is FS--------
+        ep2=1.d0
+        ep3=0.d0
+        
+        include 'pipirad/gvmd/triang_isr.f'
+        elmatre(1,1) = elmatre(1,1)+real(elmat1)
+        elmatim(1,1) = elmatim(1,1)+aimag(elmat1)
+        
+        include 'pipirad/gvmd/triang_fsr.f'
+        elmatre(1,2) = elmatre(1,2)+real(elmat2)
+        elmatim(1,2) = elmatim(1,2)+aimag(elmat2)
+
+        ep2=0.d0
+        ep3=1.d0
+
+        include 'pipirad/gvmd/triang_isr.f'
+        elmatre(2,1) = elmatre(2,1)+real(elmat1)
+        elmatim(2,1) = elmatim(2,1)+aimag(elmat1)
+        
+        include 'pipirad/gvmd/triang_fsr.f'
+        elmatre(2,2) = elmatre(2,2)+real(elmat2)
+        elmatim(2,2) = elmatim(2,2)+aimag(elmat2)
+
+        
+**************BOXES  *******************
+!!!!!!!!!!DIAGRAMS 1-12 IFI_BOXES !!!!!!!!!!!!
+#ifdef COLLIER
+
+        call C0_cll(C0ax12px45m2m1p,x12*c1,mp2*c1,x45*c1,m22*c1
+     >       ,m12*c1,mp2*c1)
+
+        call C0_cll(C0ax12px45m1m2p,x12*c1,mp2*c1,x45*c1,m12*c1
+     >       ,m22*c1,mp2*c1)
+
+        call C0_cll(C0ax12px35m2m1p,x12*c1,mp2*c1,x35*c1,m22*c1
+     >       ,m12*c1,mp2*c1)
+
+        call C0_cll(C0ax12px35m1m2p,x12*c1,mp2*c1,x35*c1,m12*c1
+     >       ,m22*c1,mp2*c1)
+
+        call C0_cll(C0aex34x15em2m1,c1*me2,c1*x34,c1*x15,me2*c1,
+     >       c1*m22,c1*m12)
+
+        call C0_cll(C0appx34m2pm1,mp2*c1,mp2*c1,x34*c1,m22*c1,
+     >       mp2*c1,m12*c1)
+
+        call C0_cll(C0appx34m1pm2,mp2*c1,mp2*c1,x34*c1,m12*c1,
+     >       mp2*c1,m22*c1)
+
+        call C0_cll(C0aex34x25em1m2,c1*me2,c1*x34,c1*x25,me2*c1,
+     >       c1*m12,c1*m22)
+
+#endif
+        call Ci_d(-p4,+p3,mp2*re,m12,m22,C0md,C1apx34ppm1m2,C2md)
+        call Ci_d(-p4,+p3,mp2*re,m22,m12,C0md,C1apx34ppm2m1,C2md)
+        call Ci_d(p4,p1+p2,m12,mp2*re,m22,C0md,C1apx35x12m1pm2,
+     >       C2md)
+        call Ci_d(p4,p1+p2,m22,mp2*re,m12,C0md,C1apx35x12m2pm1,
+     >       C2md)
+        call Ci_d(p3,p1+p2,m12,mp2*re,m22,C0md,C1apx45x12m1pm2,
+     >       C2md)
+        call Ci_d(p3,p1+p2,m22,mp2*re,m12,C0md,C1apx45x12m2pm1,
+     >       C2md)
+
+        if(i.eq.3) then
+           C0ax12px45m2m1p = setrez(C0ax12px45m2m1p)
+           C0ax12px45m1m2p = setrez(C0ax12px45m1m2p)
+           C0ax12px35m2m1p = setrez(C0ax12px35m2m1p)
+           C0ax12px35m1m2p = setrez(C0ax12px35m1m2p)
+           C0aex34x15em2m1 = setrez(C0aex34x15em2m1)
+           C0appx34m2pm1   = setrez(C0appx34m2pm1)
+           C0appx34m1pm2   = setrez(C0appx34m1pm2)
+           C0aex34x25em1m2 = setrez(C0aex34x25em1m2)
+           C1apx34ppm1m2   = setrez(C1apx34ppm1m2)
+           C1apx34ppm2m1   = setrez(C1apx34ppm2m1)
+           C1apx35x12m1pm2 = setrez(C1apx35x12m1pm2)
+           C1apx35x12m2pm1 = setrez(C1apx35x12m2pm1)
+           C1apx45x12m1pm2 = setrez(C1apx45x12m1pm2)
+           C1apx45x12m2pm1 = setrez(C1apx45x12m2pm1)
+        endif
+!     If i=2 i have to take into account only Im D0_s propto 1/(eta-s')
+!     that are these one below
+        
+        if(i.eq.2) then
+           do l=1,2
+              do m=1,2                 
+                 elmatre(l,m)=0.d0
+                 elmatim(l,m)=0.d0
+              enddo
+           enddo
+           include 'pipirad/gvmd/initial_ifi.f'        
+        endif
+        if(onlyfs.eq.1) then
+           call Di_disp(-p1,-p1+p3,p2,me2*re,m12,mp2*re,m22,
+     >          x12,i,D0md,Dimd)
+           D0aepx45ex13x12em1pm2  = D0md
+           D2aepx45ex13x12em1pm2  = Dimd(2)
+           D3aepx45ex13x12em1pm2  = Dimd(3)
+
+           call Di_disp(p1,p2+p1,p3,m12,me2*re,m22,mp2*re,
+     >          x12,i,D0md,Dimd)
+
+           D1aeex45px12x13m1em2p  = Dimd(1)
+
+!!!!!!!Diag 2
+           call Di_disp(-p1,p2-p3,p2,me2*re,m22,mp2*re,m12,
+     >          x12,i,D0md,Dimd)
+
+           D0aex45pex23x12em1pm2  = D0md
+           D1aex45pex23x12em1pm2  = Dimd(1)
+           D2aex45pex23x12em1pm2  = Dimd(2)
+
+
+           call Di_disp(p1,p2+p1,p4+q,m22,me2*re,m12,mp2*re,
+     >          x12,i,D0md,Dimd)
+
+           D1aeepx45x12x23m1em2p  = Dimd(1)
+
+!!!!!!Diag 3
+           call Di_disp(-p1,p2,p4-p1,me2*re,m12,m22,mp2*re,
+     >          x12,i,D0md,Dimd)
+
+           D0aex12x35x14epem1m2p  = D0md
+           D2aex12x35x14epem1m2p  = Dimd(2)
+           D3aex12x35x14epem1m2p  = Dimd(3)
+
+           call Di_disp(p1,p2+p1,p4,m12,me2*re,m22,mp2*re,
+     >          x12,i,D0md,Dimd)
+
+           D1aeex35px12x14m1em2p  = Dimd(1)
+
+!!!!!!Diag 4
+           call Di_disp(-p1,p2,p2-p4,me2*re,m22,m12,mp2*re,
+     >          x12,i,D0md,Dimd)
+           
+           D0aex12px24ex35em1m2p = D0md
+           D1aex12px24ex35em1m2p = Dimd(1)
+           D3aex12px24ex35em1m2p = Dimd(3)
+           
+           call Di_disp(p1,p1+p2,p3+q,m22,me2*re,m12,mp2*re,
+     >          x12,i,D0md,Dimd)
+           D1aeepx35x12x24m1em2p = Dimd(1)
+        endif
+        if(onlyis.eq.1) then
+!!!!!!Diag 5
+           call Di_disp(-p1t+qt,p2t,p2t-p3t,me2*re,m22,m12,mp2*re,
+     >          x34,i,D0md,Dimd)
+           D0ax15x34px23epem1m2p = D0md
+           D1ax15x34px23epem1m2p = Dimd(1)
+           D3ax15x34px23epem1m2p = Dimd(3)
+
+           call Di_disp(-p2t,-p3t,-p3t-p4t,m12,me2*re,mp2*re,m22,
+     >          x34,i,D0md,Dimd)
+           D1aex23px34px15m2epm1 = Dimd(1)
+           
+!!!!!!Diag 6
+           call Di_disp(-p1t+qt,p2t,p2t-p4t,me2*re,m22,m12,mp2*re,
+     >          x34,i,D0md,Dimd)
+           D0ax15x34px24epem1m2p = D0md
+           D1ax15x34px24epem1m2p = Dimd(1)
+           D3ax15x34px24epem1m2p = Dimd(3)
+
+           call Di_disp(-p2t,-p4t,-p3t-p4t,m12,me2*re,mp2*re,m22,
+     >          x34,i,D0md,Dimd)
+           D1aex24px34px15m2epm1 = Dimd(1)
+
+!!!!!!Diag 7
+           call Di_disp(p1t,-p2t+qt,p1t-p3t,me2*re,m12,m22,mp2*re,
+     >          x34,i,D0md,Dimd)
+           D0aex34px13x25pem1m2p = D0md
+           D2aex34px13x25pem1m2p = Dimd(2)
+           D3aex34px13x25pem1m2p = Dimd(3)
+
+           call Di_disp(-p1t,-p3t,-p3t-p4t,m12,me2*re,mp2*re,m22,
+     >          x34,i,D0md,Dimd)
+           D1aex13px34px25m1epm2 = Dimd(1)
+
+!!!!!!Diag 8
+           call Di_disp(p1t,-p2t+qt,p1t-p4t,me2*re,m12,m22,mp2*re,
+     >          x34,i,D0md,Dimd)
+           D0aex34px14x25pem1m2p = D0md
+           D2aex34px14x25pem1m2p = Dimd(2)
+           D3aex34px14x25pem1m2p = Dimd(3)
+
+           call Di_disp(-p1t,-p4t,-p3t-p4t,m12,me2*re,mp2*re,m22,
+     >          x34,i,D0md,Dimd)
+           D1aex14px34px25m1epm2 = Dimd(1)
+        endif
+        
+!!!!!!Diag 11
+        D0aex12x45x13epem1m2p = D0aepx45ex13x12em1pm2
+        D2aex12x45x13epem1m2p = D3aepx45ex13x12em1pm2
+        D3aex12x45x13epem1m2p = D2aepx45ex13x12em1pm2
+
+!!!!!!Diag 12
+        D0aex12px23ex45em1m2p = D0aex45pex23x12em1pm2
+        D1aex12px23ex45em1m2p = D1aex45pex23x12em1pm2
+        D3aex12px23ex45em1m2p = D2aex45pex23x12em1pm2
+
+        
+*--------Same as before-------*
+        ep2=1.d0
+        ep3=0.d0
+        
+        include 'pipirad/gvmd/box_isr.f'
+        elmatre(1,1) = elmatre(1,1)+real(elmat1)
+        elmatim(1,1) = elmatim(1,1)+aimag(elmat1)
+        
+        include 'pipirad/gvmd/box_fsr.f'
+        elmatre(1,2) = elmatre(1,2)+real(elmat2)
+        elmatim(1,2) = elmatim(1,2)+aimag(elmat2)
+
+        ep2=0.d0
+        ep3=1.d0
+
+        include 'pipirad/gvmd/box_isr.f'
+        elmatre(2,1) = elmatre(2,1)+real(elmat1)
+        elmatim(2,1) = elmatim(2,1)+aimag(elmat1)
+!	print*,'NUOVA CALL',elmat1
+        include 'pipirad/gvmd/box_fsr.f'
+        elmatre(2,2) = elmatre(2,2)+real(elmat2)
+        elmatim(2,2) = elmatim(2,2)+aimag(elmat2)
+
+
+        elmatre = elmatre*4.d0*alpha*e6/(2.d0*pi)
+        elmatim	= elmatim*4.d0*alpha*e6/(2.d0*pi)
+
+        return
       end
 
 
+!===================================================!                                                                                                                     
+!       ROUTINE FOR FULL FsQED IFI IN \PI\PI\GAMMA  !                                                                                                               
+!===================================================!
+      subroutine virtualIFI_disp(p1,p2,p3,p4,q,emtx,qph)
+      implicit none
+      character*2 fs
+      common/finalstate/fs
+      real*8 ecms,ecmsnom
+      common/ecms/ecms,ecmsnom
+      double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
+      double precision qph(40,0:3)
+      double complex virtual,virtual1,bornc
+      double precision emtx
+      double precision elmat
+      double complex ff(2,2),cff(2,2)
+      complex*32 virtualq
+      external tridot,dot
+      double precision tridot,dot,eikfull
+      double precision ame,ammu,convfac,alpha,pi,ame2,ampi2,ampi
+      common/parameters/ame,ammu,convfac,alpha,pi
+      common/hparam/ampi
 
+********FsQED
+      double precision spmin,spmax
+      double complex sp,ss,spp,mz,spbck
+      double precision wsp,wspp,wbck
+      double complex dispsp,dispss,dispz
+      double complex ffpisp,ffpiss,ffpispp
+      double complex ipart,rpart
+      integer i,j,l,i1,i2
+      double precision re(2,2),im(2,2)
+      double precision res(2,2),ims(2,2)
+      double precision resp(2,2),imsp(2,2)
+*------ptlike amplitudes
+      double precision rept(2,2),impt(2,2)
+      double precision respt(2,2),imspt(2,2)
+      double precision resppt(2,2),imsppt(2,2)
+*------disp amplitudes
+      double precision redisp(2,2),imdisp(2,2)
+      double precision resdisp(2,2),imsdisp(2,2)
+      double precision respdisp(2,2),imspdisp(2,2)
+      double precision imdispIR(2,2),imdispfin(2,2)
+*-----Needed for different subtraction
+      double precision impents(2,2),impentsp(2,2),imbox(2,2)
+*-----Double dispersive
+      double precision redoubledisp(2,2),imdoubledisp(2,2)
+*-----Sokhotski–Plemelj theorem
+      double precision imresidual(2,2)
+*-----PV integral
+      double precision repv(2,2),impv(2,2)
+*-----Common
+      common/onlysp/onlysp
+      integer onlysp            !     If onlysp=1, the computation of disp=1 in pent is done only with coefficient s',
+                                !     otherwise if onlysp=0 then the computation of pent is done with coefficient s' and s (time consuming)
+      common/dispisfs/onlyis,onlyfs
+      integer onlyis,onlyfs
+      double precision elmatre(2,2),elmatim(2,2)
+      double precision elmatres(2,2),elmatims(2,2)
+      double precision elmatresp(2,2),elmatimsp(2,2)
+      double precision eta(2,2)
+      integer disp
+      double complex setrez
+      external setrez
+      double complex diff,sppv,ffpipv
+      double precision delta,psi(2)
+**********FF
+
+      integer iffpi
+      character*10 what_ffpi
+      common/ffpioption/iffpi,what_ffpi
+      double complex ffpiis
+      double precision ffpiis2
+      double complex ffpifs
+      double precision ffpifs2
+      
+      common/compotontensor/compttens
+      integer compttens
+
+      real*16 p1q(0:3),p2q(0:3),p3q(0:3),p4q(0:3),qq(0:3)
+      common/momquad/p1q,p2q,p3q,p4q,qq
+
+      double precision timein,timefin
+      
+      i1=1
+      i2=2
+
+      onlyis = 1
+      onlyfs = 1
+      
+      if(compttens.eq.1) then
+         i2=1
+      elseif(compttens.eq.2) then
+         i1=2
+      endif
+
+!      call getrnd(psi,2)
+!!!   Needed for PaVe reduction
+      call shellquad(p1,p2,p3,p4,q,p1q,p2q,p3q,p4q,qq)
+
+      if(iffpi.gt.0) then
+         call ffpi(2.d0*(ame**2+dot(p1,p2)),ffpifs,ffpifs2) 
+         call ffpi(2.d0*(ampi**2+dot(p3,p4)),ffpiis,ffpiis2)
+      endif
+
+      
+      cff(1,1)=conjg(ffpiis)
+      cff(1,2)=conjg(ffpifs)
+      cff(2,1)=conjg(ffpiis)
+      cff(2,2)=conjg(ffpifs)
+
+      ff(1,1) = ffpiis
+      ff(1,2) = ffpiis
+      ff(2,1) = ffpifs
+      ff(2,2) = ffpifs
+
+      eta(1,1) = dot(p3+p4,p3+p4)
+      eta(1,2) = dot(p3+p4,p3+p4)
+      eta(2,1) = dot(p1+p2,p1+p2)
+      eta(2,2) = dot(p1+p2,p1+p2)
+
+
+      call bk_me(p1,p2,p3,p4,q,emtx,qph)
+
+      virtual   =  (0.d0,0.d0)
+      virtualq  =  (0.d0,0.d0)
+      if(iffpi.eq.3) then
+         virtual=(0.d0,0.d0)
+         rpart=(1.d0,0.d0)
+         ipart=(0.d0,1.d0)
+         redisp=0.d0
+         imdisp=0.d0
+         resp=(0.d0,0.d0)
+         imsp=(0.d0,0.d0)
+         mz=(0.d0,0.d0)
+         
+*------POINTLIKE NEEDED FOR IR BEHAVIOR OF RE RE---------
+*     We need Re(ptlike*ff(eta))*real(C(ff(eta')))
+         onlysp = 1
+         
+         disp=1
+         call virtualIFI_ij_Box_disp(p1,p2,p3,p4,mz,mz,q,
+     >        re,im,qph,disp)
+         
+         call VirtualIFI_ij_Pent_disp_full(p1,p2,p3,p4,q,mz,mz
+     >     ,res,ims,resp,imsp,qph,disp)
+
+         rept=re+resp
+         impt=im+imsp
+!!!!! Metto -ptlike per vedere che torni la IR cancellation
+!         print*,cff
+!         print*,ff
+c$$$         do i=i1,i2
+c$$$            do j=1,2
+c$$$               virtual=virtual-real(
+c$$$     >              (rept(i,j)+ipart*impt(i,j))*cff(i,j)*ff(i,j))
+c$$$            enddo
+c$$$         enddo
+c$$$         print*,'PTLIKE',-virtual
+c$$$         
+c$$$         virtual =(0.d0,0.d0)
+*     IR part coming from ReRe (not to be weighted MC)
+         do i=i1,i2
+            do j=1,2
+               virtual=virtual
+     >              +rept(i,j)*real(ff(i,j))*real(cff(i,j))
+            enddo
+         enddo
+*---- Generate s' and evaluate F_pi(s')
+         spmin = 4.d0*ampi**2
+         spmax = 9.d0 
+         if(spmax.le.ecmsnom**2*1.5d0) spmax=ecmsnom**2*1.5d0
+     
+!         call sp_multich(spmin,spmax,aimag(ff(1,1)),sp,wsp)
+!         call sp_oosp(spmin,spmax,sp,wsp)
+         call sp_pv(spmin,spmax,eta(1,1),sp,wsp)
+         call ffpi(real(sp),ffpisp,ffpifs2) 
+         spbck=sp
+         wbck=wsp
+         
+*---- DISPERSIVE s'
+         onlysp=0
+        
+         disp=1
+         call virtualIFI_ij_Box_disp(p1,p2,p3,p4,mz,sp,q,
+     >        re,im,qph,disp)
+         
+
+         call VirtualIFI_ij_Pent_disp_full(p1,p2,p3,p4,q,mz,sp
+     >        ,res,ims,resp,imsp,qph,disp)
+
+         redisp = redisp +re +resp
+         imdisp = imdisp +im +imsp
+
+         impents   = ims
+         impentsp =  imsp
+         imbox    = im
+         
+         call virtualIFI_ij_Box_disp(p1,p2,p3,p4,sp,mz,q,
+     >        re,im,qph,disp)
+         
+
+         call VirtualIFI_ij_Pent_disp_full(p1,p2,p3,p4,q,sp,mz
+     >        ,res,ims,resp,imsp,qph,disp)
+	
+         redisp	= redisp +re +resp
+         imdisp = imdisp +im +imsp
+         impents  = impents + ims
+         impentsp = impentsp + imsp
+         imbox  = imbox  + im
+
+*-------------------------------------
+*------------REAL PART----------------
+*-------------------------------------
+         
+*     REAL PART (CHECK THAT DOES NOT DEPEND ON LAMBDA)
+*     We need amp(s',lambda^2)+amp(lambda^2,s')+eta/(s'-eta)*amp(lambda^2,lambda^2)
+*-----------------------------------
+*---------------------------------         
+*     PV integral
+!         virtual=0.d0
+!         print*,'SP',sp
+!         print*,'virtual pre pv',virtual
+         do i=i1,i2
+            if(i.eq.1) then
+               onlyis = 1
+               onlyfs = 0
+            elseif(i.eq.2) then
+               onlyis =	0
+               onlyfs =	1
+            endif
+            diff = sp -eta(i,1)*rpart
+            sppv = eta(i,1)*rpart-diff
+            call ffpi(real(sppv),ffpipv,ffpifs2)
+!            print*,'SP, SPPV',sp,sppv
+!            print*,aimag(ffpipv),aimag(ffpisp)
+*     Check if the simmetric point is into the dispersive integration region
+            if((real(sppv).le.spmax).and.(real(sppv).ge.spmin)) then
+!               print*,'CI E IL PV'
+               onlysp = 1
+
+               disp=1
+               call virtualIFI_ij_Box_disp(p1,p2,p3,p4,mz,sppv,q,
+     >              re,im,qph,disp)               
+
+               call VirtualIFI_ij_Pent_disp_full(p1,p2,p3,p4,q,mz,
+     >              sppv,res,ims,resp,imsp,qph,disp)
+
+               repv = +re +resp
+               impv = im + imsp
+               call virtualIFI_ij_Box_disp(p1,p2,p3,p4,sppv,mz,q,
+     >              re,im,qph,disp)
+               
+               call VirtualIFI_ij_Pent_disp_full(p1,p2,p3,p4,q,sppv,
+     >              mz,res,ims,resp,imsp,qph,disp)
+               
+               repv	= repv +re +resp
+               impv     = impv +im +imsp
+*     Must take into account that we're generating s' over all range and adding the simmetric, these contribution must be divided by 2
+               do j=1,2
+                  virtual=virtual-1.d0/pi*aimag(ffpipv)*
+     >                 (repv(i,j)+eta(i,j)/(sppv-eta(i,j))*rept(i,j))
+     >                 *real(cff(i,j))/wsp/sppv/2.d0
+                  virtual=virtual-1.d0/pi*aimag(ffpisp)*
+     >                 (redisp(i,j)+eta(i,j)/(sp-eta(i,j))*rept(i,j))
+     >                 *real(cff(i,j))/wsp/sp/2.d0
+!                  print*,'i,j,virtual',i,j,virtual
+               enddo
+            else
+               do j=1,2
+                  virtual=virtual-1.d0/pi*aimag(ffpisp)*
+     >                 (redisp(i,j)+eta(i,j)/(sp-eta(i,j))*rept(i,j))
+     >                 *real(cff(i,j))/wsp/sp
+               enddo
+            endif
+!            endif
+         enddo
+         onlyis = 1
+         onlyfs = 1
+!         print*,'after pv-real',virtual
+  
+*     Here we have to carefully take into account for the Sokhotski-Plemelj
+         do i=i1,i2
+*     In the subtracted Real amplitude
+*     amp(s',lambda^2)+amp(lambda^2,s')+eta/(s'-eta)*amp(lambda^2,lambda^2)
+            
+            if(i.eq.1) then
+               onlyis = 1
+               onlyfs = 0
+            elseif(i.eq.2) then
+               onlyis =	0
+               onlyfs =	1
+            endif
+
+            sp=eta(i,1)*(1.d0-1.d0/10.d0**8)*rpart
+            onlysp = 1
+            
+            disp=1
+            call virtualIFI_ij_Box_disp(p1,p2,p3,p4,mz,sp,q,
+     >           re,im,qph,disp)
+            
+
+            call VirtualIFI_ij_Pent_disp_full(p1,p2,p3,p4,q,mz,sp
+     >           ,res,ims,resp,imsp,qph,disp)
+
+            imresidual = im + imsp
+            
+            call virtualIFI_ij_Box_disp(p1,p2,p3,p4,sp,mz,q,
+     >           re,im,qph,disp)
+            
+
+            call VirtualIFI_ij_Pent_disp_full(p1,p2,p3,p4,q,sp,mz
+     >           ,res,ims,resp,imsp,qph,disp)
+
+            imresidual = imresidual + im +imsp
+
+            do j=1,2
+*     The dispersive amplitudes has finite limit just on the left, so we have a first term            
+*     -1/pi*(pi/2*f(eta-)) where f(s')=Im(f(s'))/s'*Im(amp(s',lambda^2)+amp(lambda^2,s'))*(eta-s')
+
+               virtual=virtual-1.d0/2.d0*aimag(ff(i,j))/eta(i,j)*
+     >              imresidual(i,j)*(eta(i,j)-sp)*real(cff(i,j))
+
+            enddo
+         enddo
+         onlyis = 1
+         onlyfs = 1
+         sp=spbck
+         
+         
+         
+*-------------------------------------         
+*---------IMAGINARY PART--------------
+*-------------------------------------
+*     Here we have to underline that we ALWAYS have to call -CONJG(im(ff(eta')) due to the fact
+*     that i*i=-1
+         
+!         virtual=0.d0
+*     We start from the pointlike imaginary part
+         do i=i1,i2
+            do j=1,2
+               virtual=virtual+impt(i,j)*(-aimag(cff(i,j)))
+            enddo
+         enddo
+!         print*,'ptlikeim',virtual
+         
+!     write(12, *) real(sp), real(virtual)
+!         virtual=(0.d0,0.d0)
+*     We evaluate the subtracted one. We have already evaluated all the quantities needed
+
+         do i=i1,i2
+            do j=1,2
+               virtual=virtual-1.d0/pi*(
+     >              (aimag(ffpisp)-aimag(ff(i,j)))*imbox(i,j)                 !box
+     >              +aimag(ffpisp)*impentsp(i,j)                              !pent 
+     >              -aimag(ff(i,j))*impents(i,j)                              !pent
+     >              )/real(sp)/wsp*(-aimag(cff(i,j)))
+            enddo
+         enddo
+
+!         print*,'subim',virtual
+*     We evaluate the IR part originating from the imaginary part
+         disp=2
+         call virtualIFI_ij_Box_disp(p1,p2,p3,p4,mz,sp,q,
+     >        re,im,qph,disp)
+         
+         call VirtualIFI_ij_Pent_disp_full(p1,p2,p3,p4,q,mz,sp
+     >        ,res,ims,resp,imsp,qph,disp)
+
+         imdispIR = +im +ims
+         
+         call virtualIFI_ij_Box_disp(p1,p2,p3,p4,sp,mz,q,
+     >        re,im,qph,disp)
+
+         call VirtualIFI_ij_Pent_disp_full(p1,p2,p3,p4,q,sp,mz
+     >        ,res,ims,resp,imsp,qph,disp)
+	
+         imdispIR = imdispIR +im +ims
+         
+         do i=i1,i2
+            do j=1,2
+               virtual=virtual-1.d0/pi*(imdispIR(i,j)*aimag(ff(i,j))
+     >              *(-aimag(cff(i,j))))
+            enddo
+         enddo
+         
+!         print*,'imir',virtual
+         
+!         write(14, *) real(sp), real(virtual)
+!         virtual=(0.d0,0.d0)
+*     We evaluate the remaining Dispersive integral over s' of all other PaVe
+         disp=3
+         call virtualIFI_ij_Box_disp(p1,p2,p3,p4,mz,sp,q,
+     >        re,im,qph,disp)
+         
+         call VirtualIFI_ij_Pent_disp_full(p1,p2,p3,p4,q,mz,sp
+     >        ,res,ims,resp,imsp,qph,disp)
+
+         imdispfin = +im +ims
+         
+         call virtualIFI_ij_Box_disp(p1,p2,p3,p4,sp,mz,q,
+     >        re,im,qph,disp)
+
+         call VirtualIFI_ij_Pent_disp_full(p1,p2,p3,p4,q,sp,mz
+     >        ,res,ims,resp,imsp,qph,disp)
+	
+         imdispfin = imdispfin +im +ims
+
+         do i=i1,i2
+            do j=1,2
+               virtual=virtual-1.d0/pi*(imdispfin(i,j)*aimag(ff(i,j))
+     >              *(-aimag(cff(i,j))))/real(sp)/wsp
+            enddo
+         enddo
+!         print*,'after adding piece disp',virtual
+         
+!     emtx=real(virtual)
+!         return
+*---- Double dispersive------
+!         virtual=0.d0
+*---- Generate s'' and evaluate F_pi(s'')
+         call cpu_time(timein)
+         call sp_disp(spmin,spmax,sp,wsp)
+         call ffpi(real(sp),ffpisp,ffpifs2)
+         call sp_disp(spmin,spmax,spp,wspp)
+         call ffpi(real(spp),ffpispp,ffpifs2) 
+         onlysp = 1
+         
+         disp=1
+         call virtualIFI_ij_Box_disp(p1,p2,p3,p4,sp,spp,q,
+     >        re,im,qph,disp)
+         
+
+         call VirtualIFI_ij_Pent_disp_full(p1,p2,p3,p4,q,sp,spp
+     >        ,res,ims,resp,imsp,qph,disp)
+
+         redoubledisp = +re +resp
+         imdoubledisp = +im +imsp
+                  
+         do i=i1,i2
+            do j=1,2
+               virtual=virtual+1.d0/(pi**2)*aimag(ffpisp)*aimag(ffpispp)
+     >              *real((redoubledisp(i,j)+ipart*imdoubledisp(i,j))
+     >              *cff(i,j))/real(sp)/real(spp)/wsp/wspp
+            enddo
+         enddo
+         
+!     print*,'double disp',virtual
+!         stop
+         emtx= real(virtual)
+      endif
+
+!     print*,'dd',virtual
+      return
+      end
+      
+
+!     Questa routine fa la doppia chiamata ai pent (direct e cross)
+      subroutine VirtualIFI_ij_Pent_disp_full(p1,p2,p3,p4,q,m12,m22
+     >     ,elmatres,elmatims,elmatresp,elmatimsp,qph,disp)
+      implicit none
+      double complex m12,m22
+      double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
+      double precision qph(40,0:3)
+      integer disp
+      real*8 elmatres1(2,2),elmatims1(2,2)
+      real*8 elmatresp1(2,2),elmatimsp1(2,2)
+      real*8 elmatres(2,2),elmatims(2,2)
+      real*8 elmatresp(2,2),elmatimsp(2,2)
+      integer l,m
+      
+      call VirtualIFI_ij_Pent_disp(p1,p2,p3,p4,q,m12,m22
+     >     ,elmatres,elmatims,elmatresp,elmatimsp,qph,1,disp)
+      
+      call VirtualIFI_ij_Pent_disp(p1,p2,p3,p4,q,m12,m22
+     >     ,elmatres1,elmatims1,elmatresp1,elmatimsp1,qph,2,disp)
+
+      do l=1,2
+         do m=1,2
+            elmatres(l,m)=elmatres(l,m)+elmatres1(l,m)
+            elmatresp(l,m)=elmatresp(l,m)+elmatresp1(l,m)
+            elmatims(l,m)=elmatims(l,m)+elmatims1(l,m)
+            elmatimsp(l,m)=elmatimsp(l,m)+elmatimsp1(l,m)
+         enddo
+      enddo
+      
+      return
+      end
+
+
+      subroutine VirtualIFI_ij_Pent_disp(p1,p2,p3,p4,q,m12,m22
+     >     ,elmatres,elmatims,elmatresp,elmatimsp,qph,ind,disp) 
+#ifdef COLLIER
+      use collier
+#endif
+      implicit double complex (z)
+!      implicit none
+      double complex m12,m22,m1,m2
+      double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
+      double precision p1f(0:3),p2f(0:3),p3f(0:3),p4f(0:3),qf(0:3)
+      double precision qph(40,0:3),p3t(0:3),p4t(0:3)
+      double complex virtual,virtualpent
+      integer ind,disp,dispbck,i      
+      complex*32 virtual1
+      real*8 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
+      real*8 x12,x13,x14,x15,x23,x24,x25,x34,x35,x45
+      real*8 e2,e6,me2,me4,me6,mp2,mp4,mp6
+      complex*32 me2q
+      double precision ame,ammu,convfac,alpha,pi,ame2,ampi2,ampi
+      common/parameters/ame,ammu,convfac,alpha,pi
+      common/hparam/ampi
+      Complex*16 elmat1,elmat2,elmat3,elmat4,elmat
+
+      real*8 deltauv,lambda2,mu2dim,m2min
+      common/loop/deltauv,lambda2,mu2dim,m2min
+      common/softphotonmass/phmass
+      real*8 phmass
+      
+      external dot
+      real*8 dot
+      
+      double complex vpolc,alphar
+      
+      common/ialpharunning/iarun 
+      integer iarun
+      
+      common/onlysp/onlysp
+      integer onlysp
+      
+      complex*16 D0md,re
+      complex*32 rq
+      complex*16 Dimd(3)
+      complex*16 Dijmd(7)
+      complex*16 C0md,C1md,C2md
+      complex*16 E0md
+      complex*16 Eimd(4)
+      complex*16 Eijmd(11)
+      complex*32 E0mq
+      complex*32 Eimq(4)
+      complex*32 Eijmq(11)
+
+      complex*32 D0mq
+      complex*32 Dimq(3)
+**********FF
+
+      integer iffpi
+      character*10 what_ffpi
+      common/ffpioption/iffpi,what_ffpi
+      double complex ffpiis
+      double precision ffpiis2
+      double complex ffpifs
+      double precision ffpifs2
+      real*8 elmatres(2,2),elmatims(2,2)
+      real*8 elmatresp(2,2),elmatimsp(2,2)
+      integer l,m
+      double complex setrez
+      double precision masses(2)
+      
+*************GVMD COMMON
+      common/gvmdrad/indexnores
+      integer indexnores
+      
+      common/gvmdchecks/iscoll,fscoll
+      integer iscoll,fscoll
+
+      
+      common/compotontensor/compttens
+      integer compttens
+
+      double precision ep2,ep3
+*********CLL STUFF
+      double complex cnpi(0:0,0:1,0:1)
+      double complex cnpiuv(0:0,0:1,0:1)
+      double complex dnpi(0:1,0:2,0:2,0:2)
+      double complex dnpiuv(0:1,0:2,0:2,0:2)
+      double complex enpi(0:1,0:2,0:2,0:2,0:2)
+      double complex enpiuv(0:1,0:2,0:2,0:2,0:2)
+      double complex c1
+      parameter (c1 = (1.d0,0.d0))
+
+**************PENT  PAVE *******************
+!!!!!!!!!!DIAGRAMS 1 IFI_PENT !!!!!!!!!!!!
+
+      double complex D0ap0px12x35x45m1ppm2
+      double complex D1ap0px12x35x45m1ppm2
+      double complex D3ap0px12x35x45m1ppm2
+      double complex D1ax350x45x12ppm1ppm2
+      double complex D00ap0px12x35x45m1ppm2
+      double complex D11ap0px12x35x45m1ppm2
+      double complex D12ap0px12x35x45m1ppm2
+      double complex D13ap0px12x35x45m1ppm2
+      double complex D11ax350x45x12ppm1ppm2
+      double complex D13ax350x45x12ppm1ppm2
+
+      double complex E3aeep0px12x24x45x35x13m1em2pp
+      double complex E0aeex450x35x12x13ppx24m1em2pp
+      double complex E1aeex450x35x12x13ppx24m1em2pp
+      double complex E2aeex450x35x12x13ppx24m1em2pp
+      double complex E3aeex450x35x12x13ppx24m1em2pp
+      double complex E13aeep0px12x24x45x35x13m1em2pp
+      double complex E23aeep0px12x24x45x35x13m1em2pp
+      double complex E33aeep0px12x24x45x35x13m1em2pp
+      double complex E00aeex450x35x12x13ppx24m1em2pp
+      double complex E11aeex450x35x12x13ppx24m1em2pp
+      double complex E12aeex450x35x12x13ppx24m1em2pp
+      double complex E22aeex450x35x12x13ppx24m1em2pp
+      double complex E13aeex450x35x12x13ppx24m1em2pp
+      double complex E23aeex450x35x12x13ppx24m1em2pp
+      double complex E33aeex450x35x12x13ppx24m1em2pp
+      double complex E34aeex450x35x12x13ppx24m1em2pp
+
+**************PENT  PAVE *******************                                                                                                                                                                                                           
+!!!!!!!!!!DIAGRAMS 3 IFI_PENT !!!!!!!!!!!!                                                                                                                                                                                                             
+
+      double complex E4ae0x24px34x15x13epx25m2eepm1
+      double complex E3ae0x24px34x15x13epx25m2eepm1
+      double complex E1ax150x13px34ex24x25pem2eepm1
+      double complex E1ae0x24px34x15x13epx25m2eepm1
+      double complex E14ax150x13px34ex24x25pem2eepm1 
+      double complex E14ae0x24px34x15x13epx25m2eepm1
+      double complex E13ax150x13px34ex24x25pem2eepm1 
+      double complex E13ae0x24px34x15x13epx25m2eepm1
+      double complex E12ae0x24px34x15x13epx25m2eepm1 
+      double complex E11ax150x13px34ex24x25pem2eepm1
+      double complex E11ae0x24px34x15x13epx25m2eepm1
+      double complex E0ae0x24px34x15x13epx25m2eepm1
+      double complex E00ae0x24px34x15x13epx25m2eepm1
+      double complex E44ae0x24px34x15x13epx25m2eepm1
+      double complex E34ae0x24px34x15x13epx25m2eepm1
+      double complex E33ae0x24px34x15x13epx25m2eepm1 
+
+      double complex D0apex15px24x34pm1em2
+      double complex D3apex15px24x34pm1em2
+      double complex D2apex15px24x34pm1em2
+      double complex D1apex15px24x34pm1em2
+      
+      double complex D0apx25epx13x34pm1em2
+      double complex D2apx25epx13x34pm1em2
+      double complex D1apx25epx13x34pm1em2      
+      double complex D1appex25x34x13m1pm2e
+      
+      double complex D1aex25ex150x34em1em2
+      double complex D0a0ex34ex15x25eem2m1
+      double complex D1a0ex34ex25x15eem1m2
+      double complex D1a0ex34ex15x25eem2m1
+      
+      double complex D1aepx130x24x25em1pe
+      double complex D1a0x13pex24x25eepm1      
+      double complex D1a0epx13x25x24eem1p
+      double complex D0a0epx13x25x24eem1p
+
+      double complex C0ax24peepm1
+      double complex C0ax13px25epm1
+      double complex C0appx34m2pm1
+
+      common/dispisfs/onlyis,onlyfs
+      integer onlyis,onlyfs
+     
+      C0ax24peepm1   = (0.d0,0.d0)
+      C0ax13px25epm1 = (0.d0,0.d0)
+      C0appx34m2pm1  = (0.d0,0.d0)
+      
+      masses(1)  = real(m12)
+      masses(2)  = real(m22)
+
+      re =(1.d0,0.d0)
+
+      e2 = 4.d0*pi*alpha
+      e6 = e2*e2*e2
+      ame2=ame*ame
+      ampi2=ampi*ampi
+      me2=ame2
+      mp2=ampi2
+      me4=me2**2
+      me6=me2**3
+      mp4=mp2**2
+      mp6=mp2**3
+
+      if(ind.eq.1) then
+         p3t=p3
+         p4t=p4
+      elseif(ind.eq.2) then
+         p3t=p4
+         p4t=p3
+      endif
+
+      call new_boost(p3+p4,p1,p1f,1)
+      call new_boost(p3+p4,p2,p2f,1)
+      call new_boost(p3+p4,p3t,p3f,1)
+      call new_boost(p3+p4,p4t,p4f,1)
+      call new_boost(p3+p4,q,qf,1)
+
+      me2q = (ame*1.q0)*(ame*1.q0)
+      p1p2 = dot(p1,p2)
+      p1p3 = dot(p1,p3t)
+      p1p4 = dot(p1,p4t)
+      kp1  = dot(p1,q)
+      p2p3 = dot(p2,p3t)
+      p2p4 = dot(p2,p4t) 
+      kp2  = dot(p2,q)
+      kp3 = dot(p3t,q)
+      p3p4 = dot(p3t,p4t)
+      kp4  = dot(p4t,q)
+      
+      x12  = 2d0*ame2+2.d0*p1p2
+      x13  = ame2+ampi2-2.d0*p1p3
+      x14  = ame2+ampi2-2.d0*p1p4
+      x15  = ame2-2.d0*kp1
+      x23  = ame2+ampi2-2d0*p2p3
+      x24  = ame2+ampi2-2d0*p2p4
+      x25 = ame2-2d0*kp2
+      x34 = 2d0*ampi2+2d0*p3p4
+      x35 = ampi2+2d0*kp3
+      x45 = ampi2+2d0*kp4
+
+      m1  = sqrt(m12)
+      m2  = sqrt(m22)
+
+      elmatres=0.d0
+      elmatims=0.d0
+      elmatresp=0.d0
+      elmatimsp=0.d0
+!!!!!!!!!!!!!!!PENT 1(FSR)!!!!!!!!!!!!!!!!!
+      if(onlyfs.eq.1) then
+         if(disp.eq.1) then
+            
+            call Eij_disp(p1,p1+p2,p3t,p3t+q,m12*re,me2*re,m22*re,mp2*re
+     >           ,mp2*re,x12,disp,E0md,Eimd,Eijmd)
+            if(fscoll.eq.1) then
+               call Eij_dispq(p1,p1+p2,p3t,p3t+q,m12*re,me2*re,m22*re,
+     >              mp2*re,mp2*re,x12,disp,E0mq,Eimq,Eijmq)
+               E0md  = E0mq
+               Eimd  = Eimq
+               Eijmd = Eijmq
+            endif
+            E0aeex450x35x12x13ppx24m1em2pp   = E0md
+            E1aeex450x35x12x13ppx24m1em2pp   = Eimd(1)
+            E2aeex450x35x12x13ppx24m1em2pp   = Eimd(2)
+            E3aeex450x35x12x13ppx24m1em2pp   = Eimd(3)
+            E3aeep0px12x24x45x35x13m1em2pp   = Eimd(4)
+            E00aeex450x35x12x13ppx24m1em2pp  = Eijmd(1)
+            E11aeex450x35x12x13ppx24m1em2pp  = Eijmd(2)
+            E12aeex450x35x12x13ppx24m1em2pp  = Eijmd(3)
+            E13aeex450x35x12x13ppx24m1em2pp  = Eijmd(4)
+            E13aeep0px12x24x45x35x13m1em2pp  = Eijmd(5)
+            E22aeex450x35x12x13ppx24m1em2pp  = Eijmd(6)
+            E23aeex450x35x12x13ppx24m1em2pp  = Eijmd(7)
+            E23aeep0px12x24x45x35x13m1em2pp  = Eijmd(8)
+            E33aeex450x35x12x13ppx24m1em2pp  = Eijmd(9)
+            E34aeex450x35x12x13ppx24m1em2pp  = Eijmd(10)
+            E33aeep0px12x24x45x35x13m1em2pp  = Eijmd(11)
+
+!     Solo se disp=1 mi serve il tutto con i coefficienti s'
+            include 'pipirad/gvmd/pent1_isr.f'
+            elmatresp(2,1) = elmatresp(2,1)+real(elmat1)
+            elmatimsp(2,1) = elmatimsp(2,1)+aimag(elmat1)
+
+            include 'pipirad/gvmd/pent1_fsr.f'
+
+            if(ind.eq.2) then
+               elmat2=-elmat2
+            endif
+            elmatresp(2,2) = elmatresp(2,2)+real(elmat2)
+            elmatimsp(2,2) = elmatimsp(2,2)+aimag(elmat2)
+         endif
+!     print*,'DISP ORIGINALE',disp
+         dispbck=disp
+
+         if((disp.eq.1).and.onlysp.eq.1) then
+            continue
+         else
+            if(disp.eq.1) disp=disp+3
+            
+!     print*,'DISP CAMBIA SOLO SE DISP=1',disp
+!     Qui ora valuto la i coefficienti in \eta e non in s' ( sia in penti_isr/fsr.f
+!     che nella riduzione delle Eij)
+            
+            call Eij_disp(p1,p1+p2,p3t,p3t+q,m12*re,me2*re,m22*re,mp2*re
+     >           ,mp2*re,x12,disp,E0md,Eimd,Eijmd)
+            if(fscoll.eq.1) then
+               call Eij_dispq(p1,p1+p2,p3t,p3t+q,m12*re,me2*re,m22*re,
+     >              mp2*re,mp2*re,x12,disp,E0mq,Eimq,Eijmq)
+               E0md  = E0mq
+               Eimd  = Eimq
+               Eijmd = Eijmq
+            endif
+
+!     print*,E0md
+!     print*,Eimd
+            E0aeex450x35x12x13ppx24m1em2pp   = E0md
+            E1aeex450x35x12x13ppx24m1em2pp   = Eimd(1)
+            E2aeex450x35x12x13ppx24m1em2pp   = Eimd(2)
+            E3aeex450x35x12x13ppx24m1em2pp   = Eimd(3)
+            E3aeep0px12x24x45x35x13m1em2pp   = Eimd(4)
+            E00aeex450x35x12x13ppx24m1em2pp  = Eijmd(1)
+            E11aeex450x35x12x13ppx24m1em2pp  = Eijmd(2)
+            E12aeex450x35x12x13ppx24m1em2pp  = Eijmd(3)
+            E13aeex450x35x12x13ppx24m1em2pp  = Eijmd(4)
+            E13aeep0px12x24x45x35x13m1em2pp  = Eijmd(5)
+            E22aeex450x35x12x13ppx24m1em2pp  = Eijmd(6)
+            E23aeex450x35x12x13ppx24m1em2pp  = Eijmd(7)
+            E23aeep0px12x24x45x35x13m1em2pp  = Eijmd(8)
+            E33aeex450x35x12x13ppx24m1em2pp  = Eijmd(9)
+            E34aeex450x35x12x13ppx24m1em2pp  = Eijmd(10)
+            E33aeep0px12x24x45x35x13m1em2pp  = Eijmd(11)
+
+            do i=1,2
+               if (masses(i).ge.4.d0*ampi**2) then
+                  if (i.eq.1) m12 = x12*re
+                  if (i.eq.2) m22 = x12*re
+               endif
+            enddo
+
+            include 'pipirad/gvmd/pent1_isr.f'
+            elmatres(2,1) = elmatres(2,1)+real(elmat1)
+            elmatims(2,1) = elmatims(2,1)+aimag(elmat1)
+
+            include 'pipirad/gvmd/pent1_fsr.f'
+            if(ind.eq.2) then
+               elmat2=-elmat2
+            endif
+            elmatres(2,2) = elmatres(2,2)+real(elmat2)
+            elmatims(2,2) = elmatims(2,2)+aimag(elmat2)
+            
+            m12  =  masses(1)*(1.d0,0.d0)
+            m22  =  masses(2)*(1.d0,0.d0)
+
+            disp = dispbck
+         endif
+      endif
+!!!!!!!!!!!!!!!!!PENT 3 (ISR)!!!!!!!!!!!!!!!!!
+!!!!  MOMENTI NEL RF FS RIPOSO  !!!!!!!!!!!!!!
+!     print*,'DISP DEVE ESSERE TORNATO ORIGINALE',disp
+c     Le C0 non danno i poli 1/(eta-s'), quindi per i=2 vanno spente
+      if(onlyis.eq.1) then
+         if(disp.eq.1) then
+            
+#ifdef COLLIER
+
+            call C0_cll(C0ax24peepm1,c1*x24,c1*mp2,c1*me2,
+     >           c1*me2,c1*mp2,c1*m12)
+
+            call C0_cll(C0ax13px25epm1,c1*x13,c1*mp2,c1*x25,
+     >           c1*me2,c1*mp2,c1*m12)
+
+            call C0_cll(C0appx34m2pm1,c1*mp2,c1*mp2,c1*x34,
+     >           c1*m22,c1*mp2,c1*m12)
+            
+#endif      
+
+            call Eij_disp(-p1f,-p1f+qf,-p3f,-p3f-p4f,
+     >           m22*re,me2*re,me2*re,mp2*re,m12*re,x34,
+     >           disp,E0md,Eimd,Eijmd)
+            
+            if(iscoll.eq.1) then
+               call Eij_dispq(-p1f,-p1f+qf,-p3f,-p3f-p4f,
+     >              m22*re,me2*re,me2*re,mp2*re,m12*re,x34,
+     >              disp,E0mq,Eimq,Eijmq)   
+               E0md  = E0mq
+               Eimd  = Eimq
+               Eijmd = Eijmq
+            endif
+            E0ae0x24px34x15x13epx25m2eepm1   = E0md
+            E1ae0x24px34x15x13epx25m2eepm1   = Eimd(1)
+            E1ax150x13px34ex24x25pem2eepm1   = Eimd(2)
+            E3ae0x24px34x15x13epx25m2eepm1   = Eimd(3)
+            E4ae0x24px34x15x13epx25m2eepm1   = Eimd(4)
+            E00ae0x24px34x15x13epx25m2eepm1  = Eijmd(1)
+            E11ae0x24px34x15x13epx25m2eepm1  = Eijmd(2)
+            E12ae0x24px34x15x13epx25m2eepm1  = Eijmd(3)
+            E13ae0x24px34x15x13epx25m2eepm1  = Eijmd(4)
+            E14ae0x24px34x15x13epx25m2eepm1  = Eijmd(5)
+            E11ax150x13px34ex24x25pem2eepm1  = Eijmd(6)
+            E13ax150x13px34ex24x25pem2eepm1  = Eijmd(7)
+            E14ax150x13px34ex24x25pem2eepm1  = Eijmd(8)
+            E33ae0x24px34x15x13epx25m2eepm1  = Eijmd(9)
+            E34ae0x24px34x15x13epx25m2eepm1  = Eijmd(10)     
+            E44ae0x24px34x15x13epx25m2eepm1  = Eijmd(11)
+
+            call Di_disp(-p4f,p2f-p4f,p3f,mp2*re,m12*re,
+     >           me2*re,m22*re,x34,disp,D0md,Dimd)
+            D0apex15px24x34pm1em2 = D0md
+            D1apex15px24x34pm1em2 = Dimd(1)
+            D2apex15px24x34pm1em2 = Dimd(2)
+            D3apex15px24x34pm1em2 = Dimd(3)
+            
+            
+            call Di_disp(-p4f,-p1f+p3f,p3f,mp2*re,m12*re,
+     >           me2*re,m22*re,x34,disp,D0md,Dimd)
+            
+            D0apx25epx13x34pm1em2 = D0md
+            D2apx25epx13x34pm1em2 = Dimd(2)
+            D1apx25epx13x34pm1em2 = Dimd(1)
+            
+            
+            call Di_disp(p4f,p3f+p4f,p2f-qf,m12*re,mp2*re,
+     >           m22*re,me2*re,x34,disp,D0md,Dimd)
+            
+            D1appex25x34x13m1pm2e = Dimd(1)  
+            
+            call Di_disp(-p2f,-qf,p1f-qf,me2*re,m12*re,me2*re,
+     >           m22*re,x34,disp,D0md,Dimd)
+            D1aex25ex150x34em1em2 = Dimd(1)
+            D0a0ex34ex15x25eem2m1 = D0md
+            D1a0ex34ex15x25eem2m1 = Dimd(2)
+            
+            call Di_disp(qf,-p2f+qf,p1f,me2*re,me2*re,m12*re,
+     >           m22*re,x34,disp,D0md,Dimd)
+            D1a0ex34ex25x15eem1m2 =Dimd(1)
+            
+            
+            call Di_disp(qf,-p2f+qf,p1f-p3f,me2*re,me2*re,
+     >           m12*re,mp2*re,x34,disp,D0md,Dimd)
+            
+            D1a0epx13x25x24eem1p = Dimd(1)
+            D0a0epx13x25x24eem1p = D0md
+            D1aepx130x24x25em1pe = Dimd(2)
+            
+            call Di_disp(-qf,p4f-p2f,-p2f,me2*re,me2*re,
+     >           mp2*re,m12*re,x34,disp,D0md,Dimd)
+            D1a0x13pex24x25eepm1 =Dimd(1)
+
+!     Solo se disp=1 mi serve il tutto con i coefficienti s'
+
+            
+            include 'pipirad/gvmd/pent3_isr.f'
+            if(ind.eq.2) then
+               elmat1=-elmat1
+            endif
+            
+            elmatresp(1,1) = elmatresp(1,1)+real(elmat1)
+            elmatimsp(1,1) = elmatimsp(1,1)+aimag(elmat1)
+
+            include 'pipirad/gvmd/pent3_fsr.f'
+            
+            elmatresp(1,2) = elmatresp(1,2)+real(elmat2)
+            elmatimsp(1,2) = elmatimsp(1,2)+aimag(elmat2)
+
+         endif
+
+         dispbck=disp
+         if((disp.eq.1).and.onlysp.eq.1) then
+            continue
+         else
+
+            if(disp.eq.1) disp=disp+3
+!     print*,'DISP CAMBIA SE DISP=1',disp
+!     Qui ora valuto la i coefficienti in \eta e non in s' ( sia in penti_isr/fsr.f
+!     che nella riduzione delle Eij)
+
+            if(disp.ne.2) then
+#ifdef COLLIER
+
+               call C0_cll(C0ax24peepm1,c1*x24,c1*mp2,c1*me2,
+     >              c1*me2,c1*mp2,c1*m12)
+
+               call C0_cll(C0ax13px25epm1,c1*x13,c1*mp2,c1*x25,
+     >              c1*me2,c1*mp2,c1*m12)
+
+               call C0_cll(C0appx34m2pm1,c1*mp2,c1*mp2,c1*x34,
+     >              c1*m22,c1*mp2,c1*m12)
+               
+#endif
+               if(disp.eq.3) then
+                  C0ax24peepm1=setrez(C0ax24peepm1)
+                  C0ax13px25epm1=setrez(C0ax13px25epm1)
+                  C0appx34m2pm1=setrez(C0appx34m2pm1)
+               endif
+               
+            endif
+            
+            call Eij_disp(-p1f,-p1f+qf,-p3f,-p3f-p4f,
+     >           m22*re,me2*re,me2*re,mp2*re,m12*re,x34,
+     >           disp,E0md,Eimd,Eijmd)
+!!!!  Quad if needed
+            if(iscoll.eq.1) then
+               call Eij_dispq(-p1f,-p1f+qf,-p3f,-p3f-p4f,
+     >              m22*re,me2*re,me2*re,mp2*re,m12*re,x34,
+     >              disp,E0mq,Eimq,Eijmq)
+               E0md  = E0mq
+               Eimd  = Eimq
+               Eijmd = Eijmq
+
+            endif
+
+            E0ae0x24px34x15x13epx25m2eepm1   = E0md
+            E1ae0x24px34x15x13epx25m2eepm1   = Eimd(1)
+            E1ax150x13px34ex24x25pem2eepm1   = Eimd(2)
+            E3ae0x24px34x15x13epx25m2eepm1   = Eimd(3)
+            E4ae0x24px34x15x13epx25m2eepm1   = Eimd(4)
+            E00ae0x24px34x15x13epx25m2eepm1  = Eijmd(1)
+            E11ae0x24px34x15x13epx25m2eepm1  = Eijmd(2)
+            E12ae0x24px34x15x13epx25m2eepm1  = Eijmd(3)
+            E13ae0x24px34x15x13epx25m2eepm1  = Eijmd(4)
+            E14ae0x24px34x15x13epx25m2eepm1  = Eijmd(5)
+            E11ax150x13px34ex24x25pem2eepm1  = Eijmd(6)
+            E13ax150x13px34ex24x25pem2eepm1  = Eijmd(7)
+            E14ax150x13px34ex24x25pem2eepm1  = Eijmd(8)
+            E33ae0x24px34x15x13epx25m2eepm1  = Eijmd(9)
+            E34ae0x24px34x15x13epx25m2eepm1  = Eijmd(10)     
+            E44ae0x24px34x15x13epx25m2eepm1  = Eijmd(11)
+
+            if(disp.ne.4) disp=disp+3
+!     print*,'DISP CAMBIA SE DISP NE 1(4)',disp
+            call Di_disp(-p4f,p2f-p4f,p3f,mp2*re,m12*re,
+     >           me2*re,m22*re,x34,disp,D0md,Dimd)
+            D0apex15px24x34pm1em2 = D0md
+            D1apex15px24x34pm1em2 = Dimd(1)
+            D2apex15px24x34pm1em2 = Dimd(2)
+            D3apex15px24x34pm1em2 = Dimd(3)
+            
+            
+            call Di_disp(-p4f,-p1f+p3f,p3f,mp2*re,m12*re,
+     >           me2*re,m22*re,x34,disp,D0md,Dimd)
+            
+            D0apx25epx13x34pm1em2 = D0md
+            D2apx25epx13x34pm1em2 = Dimd(2)
+            D1apx25epx13x34pm1em2 = Dimd(1)
+            
+            
+            call Di_disp(p4f,p3f+p4f,p2f-qf,m12*re,mp2*re,
+     >           m22*re,me2*re,x34,disp,D0md,Dimd)
+            
+            D1appex25x34x13m1pm2e = Dimd(1)  
+            
+            call Di_disp(-p2f,-qf,p1f-qf,me2*re,m12*re,me2*re,
+     >           m22*re,x34,disp,D0md,Dimd)
+            D1aex25ex150x34em1em2 = Dimd(1)
+            D0a0ex34ex15x25eem2m1 = D0md
+            D1a0ex34ex15x25eem2m1 = Dimd(2)
+            
+            call Di_disp(qf,-p2f+qf,p1f,me2*re,me2*re,m12*re,
+     >           m22*re,x34,disp,D0md,Dimd)
+            D1a0ex34ex25x15eem1m2 =Dimd(1)
+            
+            
+            call Di_disp(qf,-p2f+qf,p1f-p3f,me2*re,me2*re,
+     >           m12*re,mp2*re,x34,disp,D0md,Dimd)
+            
+            D1a0epx13x25x24eem1p = Dimd(1)
+            D0a0epx13x25x24eem1p = D0md
+            D1aepx130x24x25em1pe = Dimd(2)
+            
+            call Di_disp(-qf,p4f-p2f,-p2f,me2*re,me2*re,
+     >           mp2*re,m12*re,x34,disp,D0md,Dimd)
+            D1a0x13pex24x25eepm1 =Dimd(1)
+
+            disp = dispbck
+            
+            do i=1,2
+               if (masses(i).ge.4.d0*ampi**2) then
+                  if (i.eq.1) m12 = x34*re
+                  if (i.eq.2) m22 = x34*re
+               endif
+            enddo
+
+            include 'pipirad/gvmd/pent3_isr.f'
+            if(ind.eq.2) then
+               elmat1=-elmat1
+            endif
+            
+            elmatres(1,1) = elmatres(1,1)+real(elmat1)
+            elmatims(1,1) = elmatims(1,1)+aimag(elmat1)
+
+            include 'pipirad/gvmd/pent3_fsr.f'
+            
+            elmatres(1,2) = elmatres(1,2)+real(elmat2)
+            elmatims(1,2) = elmatims(1,2)+aimag(elmat2)
+
+            m12  =  masses(1)*(1.d0,0.d0)
+            m22  =  masses(2)*(1.d0,0.d0)
+
+            disp = dispbck
+         endif
+      endif
+      elmatres  = elmatres*4.d0*alpha*e6/(2.d0*pi)
+      elmatims	= elmatims*4.d0*alpha*e6/(2.d0*pi)
+      elmatresp = elmatresp*4.d0*alpha*e6/(2.d0*pi)
+      elmatimsp	= elmatimsp*4.d0*alpha*e6/(2.d0*pi)
+
+      end
+      
+      
+
+      
+
+      !===================================================!
+      !  GVMD ROUTINES FOR IFI IN \PI\PI\GAMMA            !   MG 13/02/26
+      !===================================================!
+
+!===================================================!                                                                                                                     
+!  ROUTINE FOR IFI WITH MASSES M1,M2 IN \PI\PI\GAMMA!                                                                                                               
+!===================================================!
+
+      subroutine virtualIFI_ij_GVMD(p1,p2,p3,p4,m12,m22
+     >     ,q,virtual,qph)
+#ifdef COLLIER 
+        use collier
+#endif
+	implicit double complex (z)
+!        implicit none
+        double complex m12,m22,m1,m2
+	double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
+	double precision qph(40,0:3)
+	double complex virtual,virtualpent,virtualpent1
+        complex*32 virtual1,virtualq
+	real*8 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
+	real*8 x12,x13,x14,x15,x23,x24,x25,x34,x35,x45
+	real*8 ep2,ep3,e2,e6,me2,me4,me6,mp2,mp4,mp6
+        complex*32 me2q
+	double precision ame,ammu,convfac,alpha,pi,ame2,ampi2,ampi
+	common/parameters/ame,ammu,convfac,alpha,pi
+        common/hparam/ampi
+	Complex*16 elmat1,elmat2,elmat3,elmat4,elmat
+
+	real*8 deltauv,lambda2,mu2dim,m2min
+	common/loop/deltauv,lambda2,mu2dim,m2min
+	common/softphotonmass/phmass
+	real*8 phmass
+	
+	external dot
+	real*8 dot
+	
+        double complex vpolc,alphar
+        
+        common/ialpharunning/iarun 
+        integer iarun 	
+
+        
+        complex*16 D0md,re
+	complex*16 Dimd(3)
+        complex*16 Dijmd(7)
+        complex*32 D0mq,rq
+        complex*32 Dimq(3)
+        complex*32 Dijmq(7)
+        complex*16 C0md,C1md,C2md
+**********FF
+
+	integer iffpi
+	character*10 what_ffpi
+	common/ffpioption/iffpi,what_ffpi
+	double complex ffpiis
+	double precision ffpiis2
+	double complex ffpifs
+	double precision ffpifs2
+
+*************GVMD COMMON
+        common/gvmdrad/indexnores
+        integer indexnores
+        
+        common/gvmdchecks/iscoll,fscoll
+        integer iscoll,fscoll
+        common/checkform/intltgvmd
+        integer intltgvmd
+        
+        common/compotontensor/compttens
+        integer compttens
+*********CLL STUFF
+        double complex cnpi(0:0,0:1,0:1)
+        double complex cnpiuv(0:0,0:1,0:1)
+        double complex dnpi(0:1,0:2,0:2,0:2)
+	double complex dnpiuv(0:1,0:2,0:2,0:2)
+        double complex enpi(0:1,0:2,0:2,0:2,0:2)
+        double complex enpiuv(0:1,0:2,0:2,0:2,0:2)
+	double complex c1
+	parameter (c1 = (1.d0,0.d0))
+
+**************  QUARTIC-VERTEX  PAVE *******************
+!!! DIAGRAMS 1-4 IFI_TRIANG AND DIAGRAM 13 IFI_BOXES !!!
+
+	double complex B0aeem1
+	double complex B0aeem2
+	double complex B0ax12m1m2
+	double complex B0ax15em1
+	double complex B0ax25em2
+	double complex C0aeex12m1em2
+	double complex C0aex15x34m2em1
+	double complex B0ax34m1m2
+	double complex C0aex25x34m1em2
+
+        double complex C0ax15ex34m1em2
+        double complex D0aex15ex250x34em1em2
+        double complex D1aex15ex250x34em1em2
+        double complex D3aex15ex250x34em1em2
+        double complex D00aex15ex250x34em1em2
+        double complex D11aex15ex250x34em1em2
+        double complex D12aex15ex250x34em1em2
+        double complex D13aex15ex250x34em1em2
+        double complex D23aex15ex250x34em1em2
+        double complex D33aex15ex250x34em1em2
+        
+**************  BOXES  PAVE *******************
+!!!!!!!!!! DIAGRAMS 1-12 IFI_BOXES !!!!!!!!!!!!
+        double complex C0ax12px45m2m1p
+        double complex D0aepx45ex13x12em1pm2
+        double complex D1aeex45px12x13m1em2p
+        double complex D2aepx45ex13x12em1pm2
+        double complex D3aepx45ex13x12em1pm2
+
+        double complex C0ax12px45m1m2p
+        double complex D0aex45pex23x12em1pm2
+        double complex D1aeepx45x12x23m1em2p
+        double complex D1aex45pex23x12em1pm2
+        double complex D2aex45pex23x12em1pm2
+
+        double complex C0ax12px35m2m1p
+        double complex D0aex12x35x14epem1m2p
+        double complex D1aeex35px12x14m1em2p
+        double complex D2aex12x35x14epem1m2p
+        double complex D3aex12x35x14epem1m2p
+
+        double complex C0ax12px35m1m2p
+        double complex D0aex12px24ex35em1m2p
+        double complex D1aeepx35x12x24m1em2p
+        double complex D1aex12px24ex35em1m2p
+        double complex D3aex12px24ex35em1m2p
+
+        double complex C0aex34x15em2m1
+        double complex C0appx34m2pm1
+        double complex C1apx34ppm1m2
+        double complex C1apx34ppm2m1
+        double complex D0ax15x34px23epem1m2p
+        double complex D1ax15x34px23epem1m2p
+        double complex D3ax15x34px23epem1m2p
+        double complex D1aex23px34px15m2epm1
+
+        double complex C0appx34m1pm2
+        double complex D0ax15x34px24epem1m2p
+        double complex D1aex24px34px15m2epm1
+        double complex D1ax15x34px24epem1m2p
+        double complex D3ax15x34px24epem1m2p
+
+        double complex C0aex34x25em1m2
+        double complex D0aex34px13x25pem1m2p
+        double complex D1aex13px34px25m1epm2
+        double complex D2aex34px13x25pem1m2p
+        double complex D3aex34px13x25pem1m2p
+
+        double complex D0aex34px14x25pem1m2p
+        double complex D1aex14px34px25m1epm2
+        double complex D2aex34px14x25pem1m2p
+        double complex D3aex34px14x25pem1m2p
+        
+        double complex C1apx35x12m1pm2
+
+        double complex C1apx35x12m2pm1
+
+        double complex C1apx45x12m1pm2
+        double complex D0aex12x45x13epem1m2p
+        double complex D2aex12x45x13epem1m2p
+        double complex D3aex12x45x13epem1m2p
+
+        double complex C1apx45x12m2pm1
+        double complex D0aex12px23ex45em1m2p
+        double complex D1aex12px23ex45em1m2p
+        double complex D3aex12px23ex45em1m2p
+
+        
+        B0aeem1 = (0d0,0d0)
+	B0aeem2 = (0d0,0d0)
+	B0ax12m1m2 = (0d0,0d0)
+	B0ax15em1 = (0d0,0d0)
+	B0ax25em2 = (0d0,0d0)
+	C0aeex12m1em2 = (0d0,0d0)
+	C0aex15x34m2em1 = (0d0,0d0)
+	B0ax34m1m2 = (0d0,0d0)
+	C0aex25x34m1em2 = (0d0,0d0)
+        
+        re =(1.d0,0.d0)
+
+        e2 = 4.d0*pi*alpha
+	e6 = e2*e2*e2
+        ep2= 1.d0
+        ep3= 1.d0
+	ame2=ame*ame
+	ampi2=ampi*ampi
+        me2=ame2
+        mp2=ampi2
+        me4=me2**2
+        me6=me2**3
+        mp4=mp2**2
+        mp6=mp2**3
+
+        me2q = (ame*1.q0)*(ame*1.q0)
+	p1p2 = dot(p1,p2)
+	p1p3 = dot(p1,p3)
+	p1p4 = dot(p1,p4)
+	kp1  = dot(p1,q)
+	p2p3 = dot(p2,p3)
+	p2p4 = dot(p2,p4) 
+	kp2  = dot(p2,q)
+	kp3 = dot(p3,q)
+	p3p4 = dot(p3,p4)
+	kp4  = dot(p4,q)
+					
+	x12  = 2d0*ame2+2.d0*p1p2
+	x13  = ame2+ampi2-2.d0*p1p3
+	x14  = ame2+ampi2-2.d0*p1p4
+	x15  = ame2-2.d0*kp1
+	x23  = ame2+ampi2-2d0*p2p3
+	x24  = ame2+ampi2-2d0*p2p4
+	x25 = ame2-2d0*kp2
+	x34 = 2d0*ampi2+2d0*p3p4
+	x35 = ampi2+2d0*kp3
+	x45 = ampi2+2d0*kp4
+
+        m1  = sqrt(m12)
+        m2  = sqrt(m22)
+
+**************
+	ffpifs=(1.d0,0.d0)
+	ffpifs2=1.d0
+
+	ffpiis=(1.d0,0.d0)
+	ffpiis2=1.d0
+	if(iffpi.gt.0) then
+		call ffpi(2.d0*(ame**2+p1p2),ffpifs,ffpifs2) 
+		call ffpi(2.d0*(ampi**2+p3p4),ffpiis,ffpiis2)
+	         
+	endif	
+
+******ALPHA RUNNING	
+	ffpiis=ffpiis*vpolc(2.d0*(ampi**2+p3p4))
+	ffpiis2=ffpiis*CONJG(ffpiis)
+	
+	ffpifs=ffpifs*vpolc(2.d0*(ame**2+p1p2))
+	ffpifs2=ffpifs*CONJG(ffpifs)
+****************
+
+#ifdef COLLIER
+
+	call B0_cll(B0aeem1,c1*ame2,c1*ame2,c1*m12)
+
+        call B0_cll(B0aeem2,c1*ame2,c1*ame2,c1*m22)
+
+        call B0_cll(B0ax12m1m2,c1*x12,c1*m12,c1*m22)
+        
+        call B0_cll(B0ax15em1,c1*x15,c1*ame2,c1*m12)
+
+        call B0_cll(B0ax25em2,c1*x25,c1*ame2,c1*m22)
+
+        call B0_cll(B0ax34m1m2,c1*x34,c1*m12,c1*m22)
+        
+        call C0_cll(C0aeex12m1em2,c1*ame2,c1*ame2,c1*x12,
+     >       c1*m12,c1*ame2,c1*m22)
+
+        call C0_cll(C0aex15x34m2em1,c1*ame2,c1*x15,c1*x34,
+     >       c1*m22,c1*ame2,c1*m12)
+
+        call C0_cll(C0aex25x34m1em2,c1*ame2,c1*x25,c1*x34,
+     >       c1*m12,c1*ame2,c1*m22)
+
+        call C0_cll(C0ax15ex34m1em2,c1*x15,c1*ame2,c1*x34,
+     >       c1*m12,c1*ame2,c1*m22)
+
+        
+#endif
+
+        call Dij_d(-p1,-q,+p2-q,me2*re,m12,me2*re,m22,D0md,Dimd,Dijmd)
+
+       D0aex15ex250x34em1em2   = D0md
+       D1aex15ex250x34em1em2   = Dimd(1)
+       D3aex15ex250x34em1em2   = Dimd(3)
+       D00aex15ex250x34em1em2  = Dijmd(1)
+       D11aex15ex250x34em1em2  = Dijmd(2)
+       D12aex15ex250x34em1em2  = Dijmd(3)
+       D13aex15ex250x34em1em2  = Dijmd(4)
+       D23aex15ex250x34em1em2  = Dijmd(6)
+       D33aex15ex250x34em1em2  = Dijmd(7)
+       
+!!!!! QUI NON BISOGNA PIÙ MOLTIPLICARE ESPLICITAMENTE PER NESSUN FF IL VIRTUALE !!!!!!!!!
+!!!!!            VIENE IN MODO NATURALE DALL'INTEGRAZIONE DI LOOP               !!!!!!!!!  
+!!!!!                   IL BORN INVECE VA TENUTO ESPLICITO                      !!!!!!!!! 
+       
+********QUARTIC VERTEX
+       virtual = (0.d0,0.d0)
+**************** CROSSATO CON BORN ISR
+
+	include 'pipirad/gvmd/ifitriang_isr.f'
+
+**************************
+	virtual=elmat1*CONJG(ffpiis)
+
+****************CROSSATO CON BORN FSR
+	
+	include 'pipirad/gvmd/ifitriang_fsr.f'
+**************************
+	virtual=virtual+elmat2*CONJG(ffpifs)
+
+**************BOXES  *******************
+!!!!!!!!!! DIAGRAMS 1-12 IFI_BOXES !!!!!!!!!!!!
+
+
+#ifdef COLLIER
+
+        call C0_cll(C0ax12px45m2m1p,x12*c1,mp2*c1,x45*c1,m22*c1
+     >       ,m12*c1,mp2*c1)
+
+        call C0_cll(C0ax12px45m1m2p,x12*c1,mp2*c1,x45*c1,m12*c1
+     >	      ,m22*c1,mp2*c1)
+
+        call C0_cll(C0ax12px35m2m1p,x12*c1,mp2*c1,x35*c1,m22*c1
+     >       ,m12*c1,mp2*c1)
+
+        call C0_cll(C0ax12px35m1m2p,x12*c1,mp2*c1,x35*c1,m12*c1
+     >        ,m22*c1,mp2*c1)
+
+        call C0_cll(C0aex34x15em2m1,c1*me2,c1*x34,c1*x15,me2*c1,
+     >       c1*m22,c1*m12)
+
+        call C0_cll(C0appx34m2pm1,mp2*c1,mp2*c1,x34*c1,m22*c1,
+     >       mp2*c1,m12*c1)
+
+        call C0_cll(C0appx34m1pm2,mp2*c1,mp2*c1,x34*c1,m12*c1,
+     >       mp2*c1,m22*c1)
+
+        call C0_cll(C0aex34x25em1m2,c1*me2,c1*x34,c1*x25,me2*c1,
+     >       c1*m12,c1*m22)
+
+#endif
+
+!!!!!!!!Diag 1        
+        call Di_d(-p1,-p1+p3,p2,me2*re,m12,mp2*re,m22,D0md,Dimd)
+
+        D0aepx45ex13x12em1pm2  = D0md
+        D2aepx45ex13x12em1pm2  = Dimd(2)
+        D3aepx45ex13x12em1pm2  = Dimd(3)
+
+        call Di_d(p1,p2+p1,p3,m12,me2*re,m22,mp2*re,D0md,Dimd)
+
+        D1aeex45px12x13m1em2p  = Dimd(1)
+
+!!!!!!!Diag 2
+        call Di_d(-p1,p2-p3,p2,me2*re,m12,mp2*re,m22,D0md,Dimd)
+
+        D0aex45pex23x12em1pm2  = D0md
+        D1aex45pex23x12em1pm2  = Dimd(1)
+        D2aex45pex23x12em1pm2  = Dimd(2)
+
+
+        call Di_d(p1,p2+p1,p4+q,m12,me2*re,m22,mp2*re,D0md,Dimd)
+
+        D1aeepx45x12x23m1em2p  = Dimd(1)
+
+!!!!!!Diag 3
+        call Di_d(-p1,p2,p4-p1,me2*re,m12,m22,mp2*re,D0md,Dimd)
+
+        D0aex12x35x14epem1m2p  = D0md
+        D2aex12x35x14epem1m2p  = Dimd(2)
+        D3aex12x35x14epem1m2p  = Dimd(3)
+
+        call Di_d(p1,p2+p1,p4,m12,me2*re,m22,mp2*re,D0md,Dimd)
+
+        D1aeex35px12x14m1em2p  = Dimd(1)
+
+!!!!!!Diag 4
+        call Di_d(-p1,p2,p2-p4,me2*re,m12,m22,mp2*re,D0md,Dimd)
+        
+        D0aex12px24ex35em1m2p = D0md
+        D1aex12px24ex35em1m2p = Dimd(1)
+        D3aex12px24ex35em1m2p = Dimd(3)
+
+        call Di_d(p1,p1+p2,p3+q,m12,me2*re,m22,mp2*re,D0md,Dimd)
+        D1aeepx35x12x24m1em2p = Dimd(1)
+
+!!!!!!Diag 5
+
+        call Ci_d(-p4,+p3,mp2*re,m12,m22,C0md,C1apx34ppm1m2,C2md)
+        call Ci_d(-p4,+p3,mp2*re,m22,m12,C0md,C1apx34ppm2m1,C2md)
+
+        call Di_d(-p1+q,p2,p2-p3,me2*re,m12,m22,mp2*re,D0md,Dimd)
+        D0ax15x34px23epem1m2p = D0md
+        D1ax15x34px23epem1m2p = Dimd(1)
+        D3ax15x34px23epem1m2p = Dimd(3)
+
+        call Di_d(-p2,-p3,-p3-p4,m22,me2*re,mp2*re,m12,D0md,Dimd)
+        D1aex23px34px15m2epm1 = Dimd(1)
+
+!!!!!!Diag 6
+        
+        call Di_d(-p1+q,p2,p2-p4,me2*re,m12,m22,mp2*re,D0md,Dimd)
+        D0ax15x34px24epem1m2p = D0md
+        D1ax15x34px24epem1m2p = Dimd(1)
+        D3ax15x34px24epem1m2p = Dimd(3)
+
+        call Di_d(-p2,-p4,-p3-p4,m22,me2*re,mp2*re,m12,D0md,Dimd)
+        D1aex24px34px15m2epm1 = Dimd(1)
+
+!!!!!!Diag 7
+        
+        call Di_d(p1,-p2+q,p1-p3,me2*re,m12,m22,mp2*re,D0md,Dimd)
+        D0aex34px13x25pem1m2p = D0md
+        D2aex34px13x25pem1m2p = Dimd(2)
+        D3aex34px13x25pem1m2p = Dimd(3)
+
+        call Di_d(-p1,-p3,-p3-p4,m12,me2*re,mp2*re,m22,D0md,Dimd)
+        D1aex13px34px25m1epm2 = Dimd(1)
+
+!!!!!!Diag 8
+
+        call Di_d(p1,-p2+q,p1-p4,me2*re,m12,m22,mp2*re,D0md,Dimd)
+        D0aex34px14x25pem1m2p = D0md
+        D2aex34px14x25pem1m2p = Dimd(2)
+        D3aex34px14x25pem1m2p = Dimd(3)
+
+        call Di_d(-p1,-p4,-p3-p4,m12,me2*re,mp2*re,m22,D0md,Dimd)
+        D1aex14px34px25m1epm2 = Dimd(1)
+
+!!!!!!Diag 9
+
+        call Ci_d(p4,p1+p2,m12,mp2*re,m22,C0md,C1apx35x12m1pm2,C2md)
+
+!!!!!!Diag 10
+        call Ci_d(p4,p1+p2,m22,mp2*re,m12,C0md,C1apx35x12m2pm1,C2md)
+
+!!!!!!Diag 11
+        call Ci_d(p3,p1+p2,m12,mp2*re,m22,C0md,C1apx45x12m1pm2,C2md)
+
+        D0aex12x45x13epem1m2p = D0aepx45ex13x12em1pm2
+        D2aex12x45x13epem1m2p = D3aepx45ex13x12em1pm2
+        D3aex12x45x13epem1m2p = D2aepx45ex13x12em1pm2
+
+!!!!!!Diag 12
+        call Ci_d(p3,p1+p2,m22,mp2*re,m12,C0md,C1apx45x12m2pm1,C2md)
+
+        D0aex12px23ex45em1m2p = D0aex45pex23x12em1pm2
+        D1aex12px23ex45em1m2p = D1aex45pex23x12em1pm2
+        D3aex12px23ex45em1m2p = D2aex45pex23x12em1pm2
+
+**************** CROSSATO CON BORN ISR
+
+	include 'pipirad/gvmd/ifiboxes_isr.f'
+**************************
+	virtual=virtual+elmat1*CONJG(ffpiis)
+
+
+        
+****************CROSSATO CON BORN FSR
+	
+	include 'pipirad/gvmd/ifiboxes_fsr.f'
+**************************
+        virtual = virtual + elmat2*CONJG(ffpifs)
+
+        if(compttens.ne.0) then
+           if(compttens.eq.1) then
+              ep3=0.d0
+           elseif(compttens.eq.2) then
+              ep2=0.d0
+           endif
+           virtual=0.d0
+           include 'pipirad/gvmd/triang_isr.f'
+
+           virtual=elmat1*CONJG(ffpiis)
+           include 'pipirad/gvmd/triang_fsr.f'
+
+           virtual=virtual+elmat2*CONJG(ffpifs)
+!           print*,'UP TO TRIANG',virtual*4.d0*e6*alpha/(2d0*pi)
+           include	'pipirad/gvmd/box_isr.f'
+           virtual=virtual+elmat1*CONJG(ffpiis)
+
+           include	'pipirad/gvmd/box_fsr.f'
+           virtual=virtual+elmat2*CONJG(ffpifs)
+           
+!           print*,'UP TO BOXES',virtual*4.d0*e6*alpha/(2d0*pi)
+        endif
+
+        
+!        virtual = virtual*4.d0*e6*alpha/(2.d0*pi)
+!        return
+**************PENT  *******************
+!!!!!!!!!!DIAGRAMS 1-4 IFI_PENT!!!!!!!!!
+                
+*--------------------------------------------------------------------------------------------*        
+!!!!!!!!!!HERE WE CALL VirtualIFI_Pent TO GET THE AMPLITUDE WITH M1=M2=0!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!THEN WE CALL TWICE VirtualIFI_ij_Pent WHERE WE EVALUATE DIAGRAMS!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!1 AND 3 OF IFI_PENT WITH THE FIRST CALL AND 2-4 WITH THE SECOND!!!!!!!!!!!!!!!!!!!!!        
+*--------------------------------------------------------------------------------------------*
+        
+c$$$        if((abs(m12).le.1d-17).and.(abs(m22).le.1d-17)) then
+c$$$           indexnores=1
+c$$$!!!!  CON LA COMMON QUI SOPRA CHIAMO LE ROUTINE CHE HO GIÀ PER I PIONI FATTORIZZATI (M1=M2=0) MA ESCLUDENDO DAL CALCOLO LA MOLTIPLICAZIONE ESPLICITA DEL FF DEL VIRTUALE, CHE NON CI DEVE ESSERE NEL GVMD E RITORNA UN VALORE COMPLEX
+c$$$           call VirtualIFI_Pent(p1,p2,p3,p4,q,virtualpent,qph)
+c$$$           virtual=virtual+virtualpent/(4.d0*e6*alpha/(2.d0*pi))
+c$$$           indexnores=0
+c$$$        else
+!           compttens=0
+           call VirtualIFI_ij_Pent(p1,p2,p3,p4,q,m12,m22
+     >          ,virtualpent,qph,1)
+!           stop
+           virtual=virtual+virtualpent
+
+           call VirtualIFI_ij_Pent(p1,p2,p3,p4,q,m12,m22
+     >          ,virtualpent,qph,2)
+           virtual=virtual+virtualpent
+           
+c$$$        endif
+        virtual=4d0*virtual*e6*alpha/(2d0*pi)
+
+	end
+
+      subroutine VirtualIFI_ij_Pent(p1,p2,p3,p4,q,m12,m22
+     >     ,virtual,qph,ind) 
+#ifdef COLLIER
+      use collier
+#endif
+      implicit double complex (z)
+!      implicit none
+      double complex m12,m22,m1,m2
+      double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
+      double precision qph(40,0:3),p3t(0:3),p4t(0:3)
+      double complex virtual,virtualpent
+      integer ind
+      complex*32 virtual1
+      real*8 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
+      real*8 x12,x13,x14,x15,x23,x24,x25,x34,x35,x45
+      real*8 e2,e6,me2,me4,me6,mp2,mp4,mp6
+      complex*32 me2q
+      double precision ame,ammu,convfac,alpha,pi,ame2,ampi2,ampi
+      common/parameters/ame,ammu,convfac,alpha,pi
+      common/hparam/ampi
+      Complex*16 elmat1,elmat2,elmat3,elmat4,elmat
+
+      real*8 deltauv,lambda2,mu2dim,m2min
+      common/loop/deltauv,lambda2,mu2dim,m2min
+      common/softphotonmass/phmass
+      real*8 phmass
+      
+      external dot
+      real*8 dot
+      
+      double complex vpolc,alphar
+      
+      common/ialpharunning/iarun 
+      integer iarun 	
+
+      
+      complex*16 D0md,re
+      complex*32 rq
+      complex*16 Dimd(3)
+      complex*16 Dijmd(7)
+      complex*16 C0md,C1md,C2md
+      complex*16 E0md
+      complex*16 Eimd(4)
+      complex*16 Eijmd(11)
+      complex*32 E0mq
+      complex*32 Eimq(4)
+      complex*32 Eijmq(11)
+
+      complex*32 D0mq
+      complex*32 Dimq(3)
+**********FF
+
+      integer iffpi
+      character*10 what_ffpi
+      common/ffpioption/iffpi,what_ffpi
+      double complex ffpiis
+      double precision ffpiis2
+      double complex ffpifs
+      double precision ffpifs2
+
+*************GVMD COMMON
+      common/gvmdrad/indexnores
+      integer indexnores
+      
+      common/gvmdchecks/iscoll,fscoll
+      integer iscoll,fscoll
+
+      
+      common/compotontensor/compttens
+      integer compttens
+
+      double precision ep2,ep3
+*********CLL STUFF
+      double complex cnpi(0:0,0:1,0:1)
+      double complex cnpiuv(0:0,0:1,0:1)
+      double complex dnpi(0:1,0:2,0:2,0:2)
+      double complex dnpiuv(0:1,0:2,0:2,0:2)
+      double complex enpi(0:1,0:2,0:2,0:2,0:2)
+      double complex enpiuv(0:1,0:2,0:2,0:2,0:2)
+      double complex c1
+      parameter (c1 = (1.d0,0.d0))
+
+**************PENT  PAVE *******************
+!!!!!!!!!!DIAGRAMS 1 IFI_PENT !!!!!!!!!!!!
+
+      double complex D0ap0px12x35x45m1ppm2
+      double complex D1ap0px12x35x45m1ppm2
+      double complex D3ap0px12x35x45m1ppm2
+      double complex D1ax350x45x12ppm1ppm2
+      double complex D00ap0px12x35x45m1ppm2
+      double complex D11ap0px12x35x45m1ppm2
+      double complex D12ap0px12x35x45m1ppm2
+      double complex D13ap0px12x35x45m1ppm2
+      double complex D11ax350x45x12ppm1ppm2
+      double complex D13ax350x45x12ppm1ppm2
+
+      double complex E3aeep0px12x24x45x35x13m1em2pp
+      double complex E0aeex450x35x12x13ppx24m1em2pp
+      double complex E1aeex450x35x12x13ppx24m1em2pp
+      double complex E2aeex450x35x12x13ppx24m1em2pp
+      double complex E3aeex450x35x12x13ppx24m1em2pp
+      double complex E13aeep0px12x24x45x35x13m1em2pp
+      double complex E23aeep0px12x24x45x35x13m1em2pp
+      double complex E33aeep0px12x24x45x35x13m1em2pp
+      double complex E00aeex450x35x12x13ppx24m1em2pp
+      double complex E11aeex450x35x12x13ppx24m1em2pp
+      double complex E12aeex450x35x12x13ppx24m1em2pp
+      double complex E22aeex450x35x12x13ppx24m1em2pp
+      double complex E13aeex450x35x12x13ppx24m1em2pp
+      double complex E23aeex450x35x12x13ppx24m1em2pp
+      double complex E33aeex450x35x12x13ppx24m1em2pp
+      double complex E34aeex450x35x12x13ppx24m1em2pp
+
+**************PENT  PAVE *******************                                                                                                                                                                                                           
+!!!!!!!!!!DIAGRAMS 3 IFI_PENT !!!!!!!!!!!!                                                                                                                                                                                                             
+
+      double complex E4ae0x24px34x15x13epx25m2eepm1
+      double complex E3ae0x24px34x15x13epx25m2eepm1
+      double complex E1ax150x13px34ex24x25pem2eepm1
+      double complex E1ae0x24px34x15x13epx25m2eepm1
+      double complex E14ax150x13px34ex24x25pem2eepm1 
+      double complex E14ae0x24px34x15x13epx25m2eepm1
+      double complex E13ax150x13px34ex24x25pem2eepm1 
+      double complex E13ae0x24px34x15x13epx25m2eepm1
+      double complex E12ae0x24px34x15x13epx25m2eepm1 
+      double complex E11ax150x13px34ex24x25pem2eepm1
+      double complex E11ae0x24px34x15x13epx25m2eepm1
+      double complex E0ae0x24px34x15x13epx25m2eepm1
+      double complex E00ae0x24px34x15x13epx25m2eepm1
+      double complex E44ae0x24px34x15x13epx25m2eepm1
+      double complex E34ae0x24px34x15x13epx25m2eepm1
+      double complex E33ae0x24px34x15x13epx25m2eepm1 
+
+      double complex D0apex15px24x34pm1em2
+      double complex D3apex15px24x34pm1em2
+      double complex D2apex15px24x34pm1em2
+      double complex D1apex15px24x34pm1em2
+      
+      double complex D0apx25epx13x34pm1em2
+      double complex D2apx25epx13x34pm1em2
+      double complex D1apx25epx13x34pm1em2      
+      double complex D1appex25x34x13m1pm2e
+      
+      double complex D1aex25ex150x34em1em2
+      double complex D0a0ex34ex15x25eem2m1
+      double complex D1a0ex34ex25x15eem1m2
+      double complex D1a0ex34ex15x25eem2m1
+      
+      double complex D1aepx130x24x25em1pe
+      double complex D1a0x13pex24x25eepm1      
+      double complex D1a0epx13x25x24eem1p
+      double complex D0a0epx13x25x24eem1p
+
+      double complex C0ax24peepm1
+      double complex C0ax13px25epm1
+      double complex C0appx34m2pm1
+
+      re =(1.d0,0.d0)
+
+      e2 = 4.d0*pi*alpha
+      e6 = e2*e2*e2
+      ame2=ame*ame
+      ampi2=ampi*ampi
+      me2=ame2
+      mp2=ampi2
+      me4=me2**2
+      me6=me2**3
+      mp4=mp2**2
+      mp6=mp2**3
+
+      if(ind.eq.1) then
+         p3t=p3
+         p4t=p4
+      elseif(ind.eq.2) then
+         p3t=p4
+         p4t=p3
+      endif
+      me2q = (ame*1.q0)*(ame*1.q0)
+      p1p2 = dot(p1,p2)
+      p1p3 = dot(p1,p3t)
+      p1p4 = dot(p1,p4t)
+      kp1  = dot(p1,q)
+      p2p3 = dot(p2,p3t)
+      p2p4 = dot(p2,p4t) 
+      kp2  = dot(p2,q)
+      kp3 = dot(p3t,q)
+      p3p4 = dot(p3t,p4t)
+      kp4  = dot(p4t,q)
+      
+      x12  = 2d0*ame2+2.d0*p1p2
+      x13  = ame2+ampi2-2.d0*p1p3
+      x14  = ame2+ampi2-2.d0*p1p4
+      x15  = ame2-2.d0*kp1
+      x23  = ame2+ampi2-2d0*p2p3
+      x24  = ame2+ampi2-2d0*p2p4
+      x25 = ame2-2d0*kp2
+      x34 = 2d0*ampi2+2d0*p3p4
+      x35 = ampi2+2d0*kp3
+      x45 = ampi2+2d0*kp4
+
+      m1  = sqrt(m12)
+      m2  = sqrt(m22)
+
+**************
+      ffpifs=(1.d0,0.d0)
+      ffpifs2=1.d0
+
+      ffpiis=(1.d0,0.d0)
+      ffpiis2=1.d0
+      if(iffpi.gt.0) then
+         call ffpi(2.d0*(ame**2+p1p2),ffpifs,ffpifs2) 
+         call ffpi(2.d0*(ampi**2+p3p4),ffpiis,ffpiis2)
+         
+      endif	
+
+******ALPHA RUNNING	
+      ffpiis=ffpiis*vpolc(2.d0*(ampi**2+p3p4))
+      ffpiis2=ffpiis*CONJG(ffpiis)
+      
+      ffpifs=ffpifs*vpolc(2.d0*(ame**2+p1p2))
+      ffpifs2=ffpifs*CONJG(ffpifs)
+****************
+      ep2=1.d0
+      ep3=1.d0
+      if(compttens.eq.1) then
+         ep3=0.d0
+      elseif(compttens.eq.2) then
+         ep2=0.d0
+      endif
+
+!!!!!!!!!!!!!!!PENT 1(FSR)!!!!!!!!!!!!!!!!!
+
+      if(fscoll.eq.0) then
+       call Eij_d(p1,p1+p2,p3t,p3t+q,m12*re,me2*re,m22*re,mp2*re,mp2*re
+     >        ,E0md,Eimd,Eijmd)
+
+         E0aeex450x35x12x13ppx24m1em2pp   = E0md
+         E1aeex450x35x12x13ppx24m1em2pp   = Eimd(1)
+         E2aeex450x35x12x13ppx24m1em2pp   = Eimd(2)
+         E3aeex450x35x12x13ppx24m1em2pp   = Eimd(3)
+         E3aeep0px12x24x45x35x13m1em2pp   = Eimd(4)
+         E00aeex450x35x12x13ppx24m1em2pp  = Eijmd(1)
+         E11aeex450x35x12x13ppx24m1em2pp  = Eijmd(2)
+         E12aeex450x35x12x13ppx24m1em2pp  = Eijmd(3)
+         E13aeex450x35x12x13ppx24m1em2pp  = Eijmd(4)
+         E13aeep0px12x24x45x35x13m1em2pp  = Eijmd(5)
+         E22aeex450x35x12x13ppx24m1em2pp  = Eijmd(6)
+         E23aeex450x35x12x13ppx24m1em2pp  = Eijmd(7)
+         E23aeep0px12x24x45x35x13m1em2pp  = Eijmd(8)
+         E33aeex450x35x12x13ppx24m1em2pp  = Eijmd(9)
+         E34aeex450x35x12x13ppx24m1em2pp  = Eijmd(10)
+         E33aeep0px12x24x45x35x13m1em2pp  = Eijmd(11)
+
+!!!SE SONO COLLINEARE A FS, LE E_IJ LE VALUTO CON ROUTINE IN 4-PLA
+      
+      elseif(fscoll.eq.1) then
+        call Eij(p1,p1+p2,p3t,p3t+q,m12*re,me2*re,m22*re,mp2*re,mp2*re
+     >      ,E0mq,Eimq,Eijmq)
+
+         E0aeex450x35x12x13ppx24m1em2pp   = E0mq
+         E1aeex450x35x12x13ppx24m1em2pp   = Eimq(1)
+         E2aeex450x35x12x13ppx24m1em2pp   = Eimq(2)
+         E3aeex450x35x12x13ppx24m1em2pp   = Eimq(3)
+         E3aeep0px12x24x45x35x13m1em2pp   = Eimq(4)
+         E00aeex450x35x12x13ppx24m1em2pp  = Eijmq(1)
+         E11aeex450x35x12x13ppx24m1em2pp  = Eijmq(2)
+         E12aeex450x35x12x13ppx24m1em2pp  = Eijmq(3)
+         E13aeex450x35x12x13ppx24m1em2pp  = Eijmq(4)
+         E13aeep0px12x24x45x35x13m1em2pp  = Eijmq(5)
+         E22aeex450x35x12x13ppx24m1em2pp  = Eijmq(6)
+         E23aeex450x35x12x13ppx24m1em2pp  = Eijmq(7)
+         E23aeep0px12x24x45x35x13m1em2pp  = Eijmq(8)
+         E33aeex450x35x12x13ppx24m1em2pp  = Eijmq(9)
+         E34aeex450x35x12x13ppx24m1em2pp  = Eijmq(10)
+         E33aeep0px12x24x45x35x13m1em2pp  = Eijmq(11)
+      endif
+      
+c$$$      call Dij_d(p3t,p3t+q,p1+p2,m12*re,mp2*re,mp2*re,m22*re,
+c$$$     >     D0md,Dimd,Dijmd)
+c$$$      D0ap0px12x35x45m1ppm2  = D0md
+c$$$      D1ap0px12x35x45m1ppm2  = Dimd(1)
+c$$$      D1ax350x45x12ppm1ppm2  = Dimd(2)
+c$$$      D3ap0px12x35x45m1ppm2  = Dimd(3)
+c$$$      D00ap0px12x35x45m1ppm2 = Dijmd(1)
+c$$$      D11ap0px12x35x45m1ppm2 = Dijmd(2)
+c$$$      D12ap0px12x35x45m1ppm2 = Dijmd(3)
+c$$$      D13ap0px12x35x45m1ppm2 = Dijmd(4)
+c$$$      D11ax350x45x12ppm1ppm2 = Dijmd(5)
+c$$$      D13ax350x45x12ppm1ppm2 = Dijmd(6)
+
+      
+      include 'pipirad/gvmd/pent1_isr.f'
+
+      virtual = ep3*elmat1*CONJG(ffpiis)
+
+      include 'pipirad/gvmd/pent1_fsr.f'
+
+      if(ind.eq.2) then
+         elmat2=-elmat2
+      endif
+      
+      virtual = virtual+ ep3*elmat2*CONJG(ffpifs)
+
+!!!!!!!!!!!!!!!!!PENT 3 (ISR)!!!!!!!!!!!!!!!!!
+
+#ifdef COLLIER
+
+      call C0_cll(C0ax24peepm1,c1*x24,c1*mp2,c1*me2,
+     >     c1*me2,c1*mp2,c1*m12)
+
+      call C0_cll(C0ax13px25epm1,c1*x13,c1*mp2,c1*x25,
+     >     c1*me2,c1*mp2,c1*m12)
+
+      call C0_cll(C0appx34m2pm1,c1*mp2,c1*mp2,c1*x34,
+     >     c1*m22,c1*mp2,c1*m12)
+      
+#endif      
+
+      if(iscoll.eq.0) then
+         call Eij_d(-p1,-p1+q,-p3t,-p3t-p4t,
+     >        m22*re,me2*re,me2*re,mp2*re,m12*re,E0md,Eimd,Eijmd)
+         
+         E0ae0x24px34x15x13epx25m2eepm1   = E0md
+         E1ae0x24px34x15x13epx25m2eepm1   = Eimd(1)
+         E1ax150x13px34ex24x25pem2eepm1   = Eimd(2)
+         E3ae0x24px34x15x13epx25m2eepm1   = Eimd(3)
+         E4ae0x24px34x15x13epx25m2eepm1   = Eimd(4)
+         E00ae0x24px34x15x13epx25m2eepm1  = Eijmd(1)
+         E11ae0x24px34x15x13epx25m2eepm1  = Eijmd(2)
+         E12ae0x24px34x15x13epx25m2eepm1  = Eijmd(3)
+         E13ae0x24px34x15x13epx25m2eepm1  = Eijmd(4)
+         E14ae0x24px34x15x13epx25m2eepm1  = Eijmd(5)
+         E11ax150x13px34ex24x25pem2eepm1  = Eijmd(6)
+         E13ax150x13px34ex24x25pem2eepm1  = Eijmd(7)
+         E14ax150x13px34ex24x25pem2eepm1  = Eijmd(8)
+         E33ae0x24px34x15x13epx25m2eepm1  = Eijmd(9)
+         E34ae0x24px34x15x13epx25m2eepm1  = Eijmd(10)     
+         E44ae0x24px34x15x13epx25m2eepm1  = Eijmd(11)
+
+      call Di_d(-p4t,p2-p4t,p3t,mp2*re,m12*re,me2*re,m22*re,D0md,Dimd)
+         D0apex15px24x34pm1em2 = D0md
+         D1apex15px24x34pm1em2 = Dimd(1)
+         D2apex15px24x34pm1em2 = Dimd(2)
+         D3apex15px24x34pm1em2 = Dimd(3)
+
+
+       call Di_d(-p4t,-p1+p3t,p3t,mp2*re,m12*re,me2*re,m22*re,D0md,Dimd)
+
+         D0apx25epx13x34pm1em2 = D0md
+         D2apx25epx13x34pm1em2 = Dimd(2)
+         D1apx25epx13x34pm1em2 = Dimd(1)
+
+
+       call Di_d(p4t,p3t+p4t,p2-q,m12*re,mp2*re,m22*re,me2*re,D0md,Dimd)
+         
+         D1appex25x34x13m1pm2e = Dimd(1)  
+
+         call Di_d(-p2,-q,p1-q,me2*re,m12*re,me2*re,m22*re,D0md,Dimd)
+         D1aex25ex150x34em1em2 = Dimd(1)
+         D0a0ex34ex15x25eem2m1 = D0md
+         D1a0ex34ex15x25eem2m1 = Dimd(2)
+
+         call Di_d(q,-p2+q,p1,me2*re,me2*re,m12*re,m22*re,D0md,Dimd)
+         D1a0ex34ex25x15eem1m2 =Dimd(1)
+
+
+         call Di_d(q,-p2+q,p1-p3t,me2*re,me2*re,m12*re,mp2*re,D0md,Dimd)
+
+         D1a0epx13x25x24eem1p = Dimd(1)
+         D0a0epx13x25x24eem1p = D0md
+         D1aepx130x24x25em1pe = Dimd(2)
+
+         call Di_d(-q,p4t-p2,-p2,me2*re,me2*re,mp2*re,m12*re,D0md,Dimd)
+         D1a0x13pex24x25eepm1 =Dimd(1)
+
+      elseif(iscoll.eq.1) then
+
+         call Eij(-p1,-p1+q,-p3t,-p3t-p4t,
+     >     m22*re,me2*re,me2*re,mp2*re,m12*re,E0mq,Eimq,Eijmq)
+
+         E0ae0x24px34x15x13epx25m2eepm1   = E0mq
+         E1ae0x24px34x15x13epx25m2eepm1   = Eimq(1)
+         E1ax150x13px34ex24x25pem2eepm1   = Eimq(2)
+         E3ae0x24px34x15x13epx25m2eepm1   = Eimq(3)
+         E4ae0x24px34x15x13epx25m2eepm1   = Eimq(4)
+         E00ae0x24px34x15x13epx25m2eepm1  = Eijmq(1)
+         E11ae0x24px34x15x13epx25m2eepm1  = Eijmq(2)
+         E12ae0x24px34x15x13epx25m2eepm1  = Eijmq(3)
+         E13ae0x24px34x15x13epx25m2eepm1  = Eijmq(4)
+         E14ae0x24px34x15x13epx25m2eepm1  = Eijmq(5)
+         E11ax150x13px34ex24x25pem2eepm1  = Eijmq(6)
+         E13ax150x13px34ex24x25pem2eepm1  = Eijmq(7)
+         E14ax150x13px34ex24x25pem2eepm1  = Eijmq(8)
+         E33ae0x24px34x15x13epx25m2eepm1  = Eijmq(9)
+         E34ae0x24px34x15x13epx25m2eepm1  = Eijmq(10)     
+         E44ae0x24px34x15x13epx25m2eepm1  = Eijmq(11)
+
+         rq= (1.q0,0.q0)
+         
+         
+         call Di(-p4t,p2-p4t,p3t,mp2*rq,m12*rq,me2*rq,m22*rq,D0mq,Dimq)
+         D0apex15px24x34pm1em2 = D0mq
+         D1apex15px24x34pm1em2 = Dimq(1)
+         D2apex15px24x34pm1em2 = Dimq(2)
+         D3apex15px24x34pm1em2 = Dimq(3)
+
+         call Di(-p4t,-p1+p3t,p3t,mp2*rq,m12*rq,me2*rq,m22*rq,D0mq,Dimq)
+
+         D0apx25epx13x34pm1em2 = D0mq
+         D2apx25epx13x34pm1em2 = Dimq(2)
+         D1apx25epx13x34pm1em2 = Dimq(1)
+
+         call Di(p4t,p3t+p4t,p2-q,m12*rq,mp2*rq,m22*rq,me2*rq,D0mq,Dimq)
+         
+         D1appex25x34x13m1pm2e = Dimq(1)  
+
+         call Di(-p2,-q,p1-q,me2*rq,m12*rq,me2*rq,m22*rq,D0mq,Dimq)
+         D1aex25ex150x34em1em2 = Dimq(1)
+         D0a0ex34ex15x25eem2m1 = D0mq
+         D1a0ex34ex15x25eem2m1 = Dimq(2)
+
+         call Di(q,-p2+q,p1,me2*rq,me2*rq,m12*rq,m22*rq,D0mq,Dimq)
+         D1a0ex34ex25x15eem1m2 =Dimq(1)
+
+         call Di(q,-p2+q,p1-p3t,me2*rq,me2*rq,m12*rq,mp2*rq,D0mq,Dimq)
+
+         D1a0epx13x25x24eem1p = Dimq(1)
+         D0a0epx13x25x24eem1p = D0mq
+         D1aepx130x24x25em1pe = Dimq(2)
+
+         call Di(-q,p4t-p2,-p2,me2*rq,me2*rq,mp2*rq,m12*rq,D0mq,Dimq)
+         D1a0x13pex24x25eepm1 =Dimq(1)
+      endif
+
+      
+      include 'pipirad/gvmd/pent3_isr.f'
+      
+      if(ind.eq.2) then
+         elmat1=-elmat1
+      endif
+      virtual =  virtual+ ep2*elmat1*CONJG(ffpiis)
+      
+      include 'pipirad/gvmd/pent3_fsr.f'
+
+      virtual = virtual+ ep2*elmat2*CONJG(ffpifs)
+
+      end
+
+      
+!===================================================!                                                                                                                     
+!       ROUTINE FOR FULL GVMD IFI IN \PI\PI\GAMMA   !                                                                                                               
+!===================================================!
+
+      subroutine virtualIFI_GVMD(p1,p2,p3,p4,q,emtx,qph)
+      implicit double precision (b-i,v)
+      character*2 fs
+      common/finalstate/fs
+     
+      double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
+      double precision qph(40,0:3)
+      double complex virtual,virtual1,bornc
+      double precision emtx
+      double precision elmat
+      complex*32 virtualq
+      double precision eta
+      external tridot,dot
+      double precision tridot,dot,eikfull
+**********GVMD
+      integer i,j,k
+      double complex ct,im,cij
+      double precision m_n(1:9),g_n(1:9)
+      real*16 delta,delta1
+      double complex m12,m22
+      double complex gvmdij
+      double complex a_n(1:9),lv2(1:9),lv2diff
+      common/par_gvmd/m_n,g_n,a_n
+      double complex math,form
+      common/resonancesgvmd/nres
+      integer nres
+**********FF
+
+      integer iffpi
+      character*10 what_ffpi
+      common/ffpioption/iffpi,what_ffpi
+      double complex ffpiis
+      double precision ffpiis2
+      double complex ffpifs
+      double precision ffpifs2
+      
+
+      
+      common/compotontensor/compttens
+      integer compttens
+      
+      
+      virtual   =  (0.d0,0.d0)
+      virtualq  =  (0.d0,0.d0)
+      if(iffpi.eq.2) then
+         m12 = (0.d0,0.d0)
+         m22 = (0.d0,0.d0)
+         call virtualIFI_ij_GVMD(p1,p2,p3,p4,m12,m22,q,
+     >        virtual,qph)
+!!!!! GIÀ DEFINITI COSÌ NEL FF,OSSIA A_N/CT
+         im=(0.d0,1.d0)           
+
+!         virtual=(0.d0,0.d0)
+         do i=1,nres
+            lv2(i) = m_n(i)**2 - im*m_n(i)*g_n(i)
+
+            call  virtualIFI_ij_GVMD(p1,p2,p3,p4,m12,lv2(i),q,
+     >           gvmdij,qph)
+            virtual = virtual -a_n(i)*gvmdij
+
+            call  virtualIFI_ij_GVMD(p1,p2,p3,p4,lv2(i),m22,q,
+     >           gvmdij,qph)
+            virtual = virtual -a_n(i)*gvmdij
+
+!!!!!!!!!COMPT TENS
+c$$$            if(compttens.ne.0) then
+c$$$               m12 = (0.d0,0.d0)
+c$$$               m22 = (0.d0,0.d0)
+c$$$
+c$$$               call virtualIFI_ij_GVMD(p1,p2,p3,p4,m12,m22,q,
+c$$$     >              gvmdij,qph)
+c$$$
+c$$$               if(compttens.eq.1) then
+c$$$                  eta=dot(p3+p4,p3+p4)
+c$$$                  gvmdij=gvmdij*(-1.d0*eta/(lv2(i)-eta))
+c$$$               elseif(compttens.eq.2) then
+c$$$                  eta=dot(p1+p2,p1+p2)
+c$$$                  gvmdij=gvmdij*(-1.d0*eta/(lv2(i)-eta))
+c$$$               endif
+c$$$               virtual=virtual+a_n(i)*gvmdij
+c$$$            endif
+
+         enddo
+         
+         do i=1,nres
+            do j=1,nres
+               
+               m12 = lv2(i)
+               m22 = lv2(j)
+               call virtualIFI_ij_GVMD(p1,p2,p3,p4,m12,m22,q,
+     >              gvmdij,qph)
+               
+               virtual = virtual + a_n(i)*a_n(j)*gvmdij
+            enddo
+         enddo
+      else
+         print*,'THIS SHOULD NOT HAPPEN, STOPPING THE PROGRAM'
+         stop
+      endif
+
+      emtx= real(virtual)
+
+      return
+      end
+	
+*-------------------------------------------------------------------------------
 
 
       !===================================================!
@@ -8441,7 +12417,8 @@ c$$$	endif
       external FSRdisp,CTpidisp
       complex*16 vertexpi,ctdisp
       external vertexpi,ctdisp
-
+      common/indexfsrdisp/iFSRdisp
+      integer iFSRdisp
 ******!! MORETTI LAMBDA CHECKS ********
       real*8 I1moretti,I2moretti,I1ovsptot_lambda
       real*8 Ispovsptot_lambda
@@ -8760,7 +12737,6 @@ c            cts=2.d0*dphi/16.d0/pi/pi*alpha*4.d0*pi
 
             virtual =(rebox+imbox)/ff2+virtual
 
-            iFSRdisp=0
             FSR_disp=0d0
             CTpi_disp=0d0
             if(iFSRdisp.eq.1) then
@@ -10554,3 +14530,2541 @@ c$$$     >     ,d0eeppstxeyp
       end
 
 
+
+
+
+*-------------------------------------------------------*
+*     ROUTINES TO REDUCE TENSOR SCALAR INTEGRALS        *
+*     WHERE PAVE ARE EVALUATED IN DOUBLE PRECISION      *
+*                C_I,D_I,D_IJ,E_I,E_IJ                  *
+*-------------------------------------------------------*
+
+
+
+*-----------ROUTINES TO REDUCE CI,CIJ-------------------*      
+      subroutine Ci_d(k1,k2,m1q,m2q,m3q,C0m,C1m,C2m)
+c     In this routine we evaluate the numerical decomposition of 
+C     C_i as a function of C0,B0,A0. The convention for the loop integral is
+c      
+c         1             1          {q^mu}      
+c     --------     ----------    -------------  
+c     (q^2-m1q)  ((q+k1)^2-m2q)  ((q+k2)^2-m3q) 
+c
+
+#ifdef COLLIER
+      use collier
+#endif      
+
+      implicit none
+      double precision k1(0:3),k2(0:3),k3(0:3)
+      double precision p1LT(0:3),p2LT(0:3),p3LT(0:3),p4LT(0:3)
+      complex*16 m1q,m2q,m3q
+      complex*16 C0m,C1m,C2m
+      complex*16 B0AC,B0AB,B0BC
+      complex*16 p1LT2,p2LT2,p3LT2
+      complex*16 p1C2,p2C2,p3C2
+      integer i
+      complex*32 re,im
+      complex*16 k1k1,k2k2,k1k2
+      
+      external dotq
+      real*16 dotq
+
+      external dot
+      real*8 dot
+      double complex c1
+      parameter (c1 = (1.d0,0.d0))
+      
+      external closetomassc
+      complex*32 closetomassc
+
+      external closetomasscd
+      complex*16 closetomasscd
+      re=(1.q0,0.q0)
+
+      k1k1=closetomasscd(dot(k1,k1))
+      k2k2=closetomasscd(dot(k2,k2))
+      k1k2=closetomasscd(dot(k1,k2))
+
+      
+      do i= 0,3
+         p1LT(i)= k1(i)
+         p2LT(i)= k2(i)-k1(i)
+         p3LT(i)= k2(i)
+      enddo
+
+*     
+      p1LT2= closetomasscd(dot(p1LT,p1LT))
+      p2LT2= closetomasscd(dot(p2LT,p2LT))
+      p3LT2= closetomasscd(dot(p3LT,p3LT))
+      
+!!!!!!!!!!!!!!!!!!!!LT non sa nulla di k1k2, lo riscrive partendo da P2LT2-m1^2-m2^2, lo faccio anche qui
+
+      k1k2 = -(p2LT2-k1k1-k2k2)/2.d0
+
+      p1C2 = p1LT2*1.D0
+      p2C2 = p2LT2*1.D0
+      p3C2 = p3LT2*1.D0
+!!!!!!!!!!!!!!!!!!!!
+      
+      
+#ifdef COLLIER      
+      call C0_cll(C0m,p1C2*c1,p2C2*c1,p3C2*c1,m1q*c1,m2q*c1,m3q*c1)
+
+      call B0_cll(B0AB,p1C2*c1,m1q*c1,m2q*c1)
+
+      call B0_cll(B0AC,p3C2*c1,m1q*c1,m3q*c1)
+
+      call B0_cll(B0BC,p2C2*c1,m2q*c1,m3q*c1)
+#endif
+
+
+      C1m = (-(B0AB*k1k2) + B0BC*(k1k2 - k2k2) + B0AC*k2k2 +
+     >     C0m*(-(k1k1*k2k2) + k2k2*(-m1q + m2q) + k1k2*(k2k2 + m1q -
+     >     m3q)))/(-2.q0*k1k2**2 + 2.q0*k1k1*k2k2)
+      C2m =(-(B0AB*k1k1) + B0BC*(k1k1 - k1k2) + B0AC*k1k2 +
+     >     C0m*k1k2*(-m1q + m2q) + C0m*k1k1*(-k1k2 + k2k2 + m1q - m3q))
+     >     /(2.q0*(k1k2**2 - k1k1*k2k2))
+
+      return
+      end
+
+
+*-----------ROUTINES TO REDUCE DI,DIJ-------------------*      
+      subroutine Di_d(k1,k2,k3,m1q,m2q,m3q,m4q,D0m,Dim)
+c     In this routine we evaluate the numerical decomposition of 
+C     D_i as a function of D0,C0,B0,A0. The convention for the loop integral is
+c      
+c         1             1          {q^mu}       1
+c     --------     ----------    -------------   ------------- 
+c     (q^2-m1q)  ((q+k1)^2-m2q)  ((q+k2)^2-m3q)  ((q+k3)^2-m4q) 
+c
+
+#ifdef COLLIER
+      use collier
+#endif 
+      implicit none
+      double precision k1(0:3),k2(0:3),k3(0:3)
+      double precision p1LT(0:3),p2LT(0:3),p3LT(0:3),p4LT(0:3)
+      complex*16 m1q,m2q,m3q,m4q
+      complex*16 C0ABC,C0ABD,C0ACD,C0BCD
+      complex*16 D0m
+      complex*16 Dim(3)
+      complex*16 p1LT2,p2LT2,p3LT2,p4LT2
+      complex*16 x23LT,x12LT
+
+      complex*16 p1C2,p2C2,p3C2,p4C2
+      complex*16 x23C,x12C
+      integer i
+      complex*32 re,im
+      complex*16 k1k1,k1k2,k1k3
+      complex*16 k2k2,k2k3
+      complex*16 k3k3
+
+      double complex c1
+      parameter (c1 = (1.d0,0.d0))
+
+      external dotq
+      real*16 dotq
+
+      external dot
+      real*8 dot
+      
+      external closetomassc
+      complex*32 closetomassc
+
+      external closetomasscd
+      complex*16 closetomasscd
+      
+      re=(1.q0,0.q0)
+
+      k1k1=closetomasscd(dot(k1,k1))
+      k2k2=closetomasscd(dot(k2,k2))
+      k3k3=closetomasscd(dot(k3,k3))
+
+      do i= 0,3
+         p1LT(i)= k1(i)
+         p2LT(i)= k2(i)-k1(i)
+         p3LT(i)= k3(i)-k2(i)
+         p4LT(i)= -k3(i)
+      enddo
+
+*     
+      p1LT2= closetomasscd(dot(p1LT,p1LT))
+      p2LT2= closetomasscd(dot(p2LT,p2LT))
+      p3LT2= closetomasscd(dot(p3LT,p3LT))
+      p4LT2= closetomasscd(dot(p4LT,p4LT))
+      
+      x12LT= closetomasscd(dot(k2,k2))
+      x23LT= closetomasscd(dot(k3-k1,k3-k1))
+      
+!!!!!!!!!!!!!!!!!!!!LT non sa nulla di k1k2, lo riscrive partendo da P2LT2-m1^2-m2^2, lo faccio anche qui
+
+      k1k2 = -(p2LT2-k1k1-k2k2)/2.d0
+      k1k3 = -(x23LT-k1k1-k3k3)/2.d0
+      k2k3 = -(p3LT2-k3k3-k2k2)/2.d0
+!!!!!!!!!!!!!!!!!!!!
+
+      p1C2 = p1LT2*1.d0
+      p2C2 = p2LT2*1.d0
+      p3C2 = p3LT2*1.d0
+      p4C2 = p4LT2*1.d0
+
+      x12C = x12LT*1.d0
+      x23C = x23LT*1.d0
+#ifdef COLLIER
+      
+      call D0_cll(D0m,p1C2*c1,p2C2*c1,p3C2*c1,p4C2*c1,x12C*c1,
+     >     x23C*c1,m1q*c1,m2q*c1,m3q*c1,m4q*c1)
+
+      call C0_cll(C0ABC,p1C2,p2C2,x12C,m1q,m2q,m3q)
+
+      call C0_cll(C0ACD,x12C,p3C2,p4C2,m1q,m3q,m4q)
+
+      call C0_cll(C0ABD,p1C2,x23C,p4C2,m1q,m2q,m4q)
+
+      call C0_cll(C0BCD,p2C2,p3C2,x23C,m2q,m3q,m4q)
+
+#endif
+      include 'pipirad/decomposition5pt/Di.F'
+      return
+      end
+      
+      subroutine Dij_d(k1,k2,k3,m1q,m2q,m3q,m4q,D0m,Dim,Dijm)
+
+c     In this routine we evaluate the numerical decomposition of D_ij
+C     D_i as a function of D0,C0,B0,A0. The convention for the loop integral is
+c      
+c         1             1      {1,q^mu,q^muq^nu}       1
+c     --------     ----------    -------------   ------------- 
+c     (q^2-m1q)  ((q+k1)^2-m2q)  ((q+k2)^2-m3q)  ((q+k3)^2-m4q) 
+c
+#ifdef COLLIER
+      use collier
+#endif 
+      implicit none
+      double precision k1(0:3),k2(0:3),k3(0:3)
+      double precision p1LT(0:3),p2LT(0:3),p3LT(0:3),p4LT(0:3)
+      complex*16 m1q,m2q,m3q,m4q
+      complex*16 C0ABC,C0ABD,C0ACD,C0BCD
+      complex*16 C1ABC,C2ABC
+      complex*16 C1ABD,C2ABD
+      complex*16 C1ACD,C2ACD
+      complex*16 C1BCD,C2BCD
+      
+      complex*16 D0m
+      complex*16 D1m,D2m,D3m
+      complex*16 Dim(3),Dijm(7)
+      complex*16 bc0,bc1,bc2,bc3,bc4,bc5,bc6
+      complex*16 p1LT2,p2LT2,p3LT2,p4LT2
+      complex*16 x23LT,X12LT
+      integer i
+      complex*32 re,im
+      complex*16 k1k1,k1k2,k1k3
+      complex*16 k2k2,k2k3
+      complex*16 k3k3
+      
+      external dotq
+      real*16 dotq
+
+      external dot
+      real*8 dot
+      
+      external closetomassc
+      complex*32 closetomassc
+
+      external closetomasscd
+      complex*16 closetomasscd
+      
+      re=(1.q0,0.q0)
+
+      k1k1=closetomasscd(dot(k1,k1))
+      k2k2=closetomasscd(dot(k2,k2))
+      k3k3=closetomasscd(dot(k3,k3))
+
+      do i= 0,3
+         p1LT(i)= k1(i)
+         p2LT(i)= k2(i)-k1(i)
+         p3LT(i)= k3(i)-k2(i)
+         p4LT(i)= -k3(i)
+      enddo
+
+*     
+      p1LT2= closetomasscd(dot(p1LT,p1LT))
+      p2LT2= closetomasscd(dot(p2LT,p2LT))
+      p3LT2= closetomasscd(dot(p3LT,p3LT))
+      p4LT2= closetomasscd(dot(p4LT,p4LT))
+      
+      x12LT= closetomasscd(dot(k2,k2))
+      x23LT= closetomasscd(dot(k3-k1,k3-k1))
+      
+!!!!!!!!!!!!!!!!!!!!LT non sa nulla di k1k2, lo riscrive partendo da P2LT2-m1^2-m2^2, lo faccio anche qui
+
+      k1k2 = -(p2LT2-k1k1-k2k2)/2.d0
+      k1k3 = -(x23LT-k1k1-k3k3)/2.d0
+      k2k3 = -(p3LT2-k3k3-k2k2)/2.d0
+!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!Vettoriali e scalare  4 pt      
+      call Di_d(k1,k2,k3,m1q,m2q,m3q,m4q,D0m,Dim)
+      D1m=Dim(1)
+      D2m=Dim(2)
+      D3m=Dim(3)
+!!!!!!!!!!!!!!!!!!!!!Vettoriali 3 punti
+      call Ci_d(k1,k2,m1q,m2q,m3q,C0ABC,C1ABC,C2ABC)
+      call Ci_d(k2,k3,m1q,m3q,m4q,C0ACD,C1ACD,C2ACD)
+      call Ci_d(k1,k3,m1q,m2q,m4q,C0ABD,C1ABD,C2ABD)
+      call Ci_d(k2-k1,k3-k1,m2q,m3q,m4q,C0BCD,C1BCD,C2BCD)
+
+      include 'pipirad/decomposition5pt/Dij.F'
+      return
+      end
+      
+*-----------ROUTINES TO REDUCE EI,EIJ-------------------*      
+
+      subroutine Eij_d(k1,k2,k3,k4,m1q,m2q,m3q,m4q,m5q,E0m,Eim,Eijm)
+c     In this routine we evaluate the numerical decomposition of E_ij
+C     E_i and E_0 as a function of D0,C0,B0,A0. We use the package
+c     hexagon.m of https://arxiv.org/pdf/0812.2134 to get the symbolic
+c     decomposition. The convention for the loop integral is
+c      
+c          1             1      {1,q^mu,q^muq^nu}       1              1
+c     --------     ----------    -------------   -------------  --------------
+c     (q^2-m1q)  ((q+k1)^2-m2q)  ((q+k2)^2-m3q)  ((q+k3)^2-m4q)  ((q+k4)^2-m5q) 
+c
+#ifdef COLLIER
+      use collier
+#endif
+!      implicit none
+      implicit complex*32 (u-w)
+      double precision k1(0:3),k2(0:3),k3(0:3),k4(0:3)
+      double precision p1LT(0:3),p2LT(0:3),p3LT(0:3),p4LT(0:3),p5LT(0:3)
+      complex*16 m1q,m2q,m3q,m4q,m5q
+      complex*16 E0m,E1m,E2m,E3m,E4m
+      complex*16 E11,E12,E13,E14
+      complex*16 E22,E23,E24
+      complex*16 E33,E34
+      complex*16 E44
+      complex*32 den,den1,den2,den3,den4,den5
+      complex*16 Eim(4),Eijm(11)
+      complex*16 D0ax51LTp2LT2p3LT2p4LT2x34LTx23LTm5qm2qm3qm4q
+      complex*16 D0ax12LTp3LT2p4LT2p5LT2x45LTx34LTm1qm3qm4qm5q
+      complex*16 D0ap1LT2x23LTp4LT2p5LT2x45LTx51LTm1qm2qm4qm5q
+      complex*16 D0ap1LT2p2LT2x34LTp5LT2x12LTx51LTm1qm2qm3qm5q
+      complex*16 D0ap1LT2p2LT2p3LT2x45LTx12LTx23LTm1qm2qm3qm4q
+
+      complex*16 C0ap1LT2p2LT2x12LTm1qm2qm3q
+      complex*16 C0ap1LT2x23LTx45LTm1qm2qm4q
+      complex*16 C0ap1LT2x51LTp5LT2m1qm2qm5q
+      complex*16 C0ax12LTp3LT2x45LTm1qm3qm4q
+      complex*16 C0ax12LTx34LTp5LT2m1qm3qm5q
+      complex*16 C0ax23LTp2LT2p3LT2m4qm2qm3q
+      complex*16 C0ax34LTp3LT2p4LT2m5qm3qm4q
+      complex*16 C0ax45LTp4LT2p5LT2m1qm4qm5q
+      complex*16 C0ax51LTp2LT2x34LTm5qm2qm3q
+      complex*16 C0ax51LTx23LTp4LT2m5qm2qm4q      
+
+      complex*32 p1LT2,p2LT2,p3LT2,p4LT2,p5LT2
+      complex*32 x12LT,x23LT,x34LT,x45LT,x51LT
+      complex*16 p1C2,p2C2,p3C2,p4C2,p5C2
+      complex*16 x12C,x23C,x34C,x45C,x51C
+      integer i
+      complex*32 re,im
+      complex*32 k1k1,k1k2,k1k3,k1k4
+      complex*32 k2k2,k2k3,k2k4
+      complex*32 k3k3,k3k4
+      complex*32 k4k4
+      
+      external dotq
+      real*16 dotq
+
+      external closetomassc
+      complex*32 closetomassc
+
+      double complex c1
+      parameter (c1 = (1.d0,0.d0))
+
+      complex*16 enpi(0:0,0:0,0:0,0:0,0:0)
+      complex*16 enpiuv(0:0,0:0,0:0,0:0,0:0)
+      
+      re=(1.q0,0.q0)
+
+      k1k1=closetomassc(dotq(k1,k1)*re)
+      k2k2=closetomassc(dotq(k2,k2)*re)
+      k3k3=closetomassc(dotq(k3,k3)*re)
+      k4k4=closetomassc(dotq(k4,k4)*re)
+
+      do i= 0,3
+         p1LT(i)= k1(i)
+         p2LT(i)= k2(i)-k1(i)
+         p3LT(i)= k3(i)-k2(i)
+         p4LT(i)= k4(i)-k3(i)
+         p5LT(i)= -k4(i)
+      enddo
+
+*     
+
+      p1LT2= closetomassc(dotq(p1LT,p1LT)*re)
+      p2LT2= closetomassc(dotq(p2LT,p2LT)*re)
+      p3LT2= closetomassc(dotq(p3LT,p3LT)*re)
+      p4LT2= closetomassc(dotq(p4LT,p4LT)*re)
+      p5LT2= closetomassc(dotq(p5LT,p5LT)*re)
+      
+      x12LT= closetomassc(dotq(k2,k2)*re)
+      x23LT= closetomassc(dotq(k3-k1,k3-k1)*re)
+      x34LT= closetomassc(dotq(k4-k2,k4-k2)*re)
+      x45LT= closetomassc(dotq(k3,k3)*re)
+      x51LT= closetomassc(dotq(k1-k4,k1-k4)*re)
+
+      p1C2 = p1LT2*1.d0
+      p2C2 = p2LT2*1.d0
+      p3C2 = p3LT2*1.d0
+      p4C2 = p4LT2*1.d0
+      p5C2 = p5LT2*1.d0
+
+      
+      x12C = x12LT*1.d0
+      x23C = x23LT*1.d0
+      x34C = x34LT*1.d0
+      x45C = x45LT*1.d0
+      x51C = x51LT*1.d0
+!!!!!!!!!!!!!!!!!!!!LT non sa nulla di kikj
+      
+      k1k2 = -(p2LT2-k1k1-k2k2)/2.q0
+      k1k3 = -(x23LT-k1k1-k3k3)/2.q0
+      k1k4 = -(x51LT-k1k1-k4k4)/2.q0
+      k2k3 = -(p3LT2-k3k3-k2k2)/2.q0
+      k2k4 = -(x34LT-k2k2-k4k4)/2.q0
+      k3k4 = -(p4LT2-k3k3-k4k4)/2.q0
+
+      include 'pipirad/decomposition5pt/assignements.f'
+
+
+#ifdef COLLIER
+
+      call D0_cll(D0ax51LTp2LT2p3LT2p4LT2x34LTx23LTm5qm2qm3qm4q,
+     >     c1*x51C,c1*p2C2,c1*p3C2,c1*p4C2,c1*x34C,c1*x23C,
+     >     c1*m5q,c1*m2q,c1*m3q,c1*m4q)
+      call D0_cll(D0ax12LTp3LT2p4LT2p5LT2x45LTx34LTm1qm3qm4qm5q
+     >     ,c1*x12C,c1*p3C2,c1*p4C2,c1*p5C2,c1*x45C,c1*x34C,
+     >     c1*m1q,c1*m3q,c1*m4q,c1*m5q)
+      call D0_cll(D0ap1LT2x23LTp4LT2p5LT2x45LTx51LTm1qm2qm4qm5q
+     >     ,c1*p1C2,c1*x23C,c1*p4C2,c1*p5C2,c1*x45C,c1*x51C,
+     >     c1*m1q,c1*m2q,c1*m4q,c1*m5q)
+      call D0_cll(D0ap1LT2p2LT2x34LTp5LT2x12LTx51LTm1qm2qm3qm5q,
+     >     c1*p1C2,c1*p2C2,c1*x34C,c1*p5C2,c1*x12C,c1*x51C,
+     >     c1*m1q,c1*m2q,c1*m3q,c1*m5q)
+      call D0_cll(D0ap1LT2p2LT2p3LT2x45LTx12LTx23LTm1qm2qm3qm4q,
+     >     c1*p1C2,c1*p2C2,c1*p3C2,c1*x45C,c1*x12C,c1*x23C,
+     >     c1*m1q,c1*m2q,c1*m3q,c1*m4q)
+
+      call C0_cll(C0ap1LT2p2LT2x12LTm1qm2qm3q,
+     >     c1*p1C2,c1*p2C2,c1*x12C,c1*m1q,c1*m2q,c1*m3q)
+      call C0_cll(C0ap1LT2x23LTx45LTm1qm2qm4q,
+     >     c1*p1C2,c1*x23C,c1*x45C,c1*m1q,c1*m2q,c1*m4q)
+      call C0_cll(C0ap1LT2x51LTp5LT2m1qm2qm5q,
+     >     c1*p1C2,c1*x51C,c1*p5C2,c1*m1q,c1*m2q,c1*m5q)
+      call C0_cll(C0ax12LTp3LT2x45LTm1qm3qm4q,
+     >     c1*x12C,c1*p3C2,c1*x45C,c1*m1q,c1*m3q,c1*m4q)
+      call C0_cll(C0ax12LTx34LTp5LT2m1qm3qm5q,
+     >     c1*x12C,c1*x34C,c1*p5C2,c1*m1q,c1*m3q,c1*m5q)
+      call C0_cll(C0ax23LTp2LT2p3LT2m4qm2qm3q,
+     >     c1*x23C,c1*p2C2,c1*p3C2,c1*m4q,c1*m2q,c1*m3q)
+      call C0_cll(C0ax34LTp3LT2p4LT2m5qm3qm4q,
+     >     c1*x34C,c1*p3C2,c1*p4C2,c1*m5q,c1*m3q,c1*m4q)
+      call C0_cll(C0ax45LTp4LT2p5LT2m1qm4qm5q,
+     >     c1*x45C,c1*p4C2,c1*p5C2,c1*m1q,c1*m4q,c1*m5q)
+      call C0_cll(C0ax51LTp2LT2x34LTm5qm2qm3q,
+     >     c1*x51C,c1*p2C2,c1*x34C,c1*m5q,c1*m2q,c1*m3q)
+      call C0_cll(C0ax51LTx23LTp4LT2m5qm2qm4q,
+     >     c1*x51C,c1*x23C,c1*p4C2,c1*m5q,c1*m2q,c1*m4q)
+#endif
+!!!!!!!E0!!!!!!!!
+
+      include 'pipirad/decomposition5pt/E0.F'
+
+!!!!!!!Ei!!!!!!!!
+
+      include 'pipirad/decomposition5pt/Ei.F'
+      
+!!!!!!Eij!!!!!!!!
+      
+      include 'pipirad/decomposition5pt/Eij.F'
+      
+      return
+      end
+
+
+*-------------------------------------------------------*
+*     D_i IS GIVEN BY A PROPER COMBINATION OF D0,C0     *
+*               D_i = a D0+ b s'D0 +c C0                * 
+*     THIS ROUTINES RETURNS:                            *
+*     -DISP=1                                           *
+*              Standard loop decomposition,as D_i rout. *
+*     -DISP=2                                           *
+*              D_i=a \int ds'/s' ImD0+b \int ds' ImD0   *
+*              where it is understood that the Im.      *
+*              is the one arising from the cut of the   *
+*              2->2 process (namely behaving as 1/s-s') *
+*                                                       *      
+*     -DISP=3                                           *
+*         D_i= a \tilde{ImD0} + bs'\tilde{ImD0} +cIm C0 *
+*         where \tilde{ImD0}=ImD0 -ImD0_(22) given      *
+*         ImD0_(22) as the previous point               *
+*-------------------------------------------------------*
+
+      subroutine Di_disp(k1,k2,k3,m1q,m2q,m3q,m4q,s,disp,D0m,Dim)
+c     pi, pf are the momenta that becomes input of the D0 disp. integral 
+c     s=|p1+p2|^2 if FS real photon, s=|p3+p4|^2 if IS real photon
+#ifdef COLLIER
+      use collier
+#endif 
+      implicit none
+      double precision k1(0:3),k2(0:3),k3(0:3)
+      double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3)
+      double precision pi(0:3),pf(0:3)
+      double precision p1LT(0:3),p2LT(0:3),p3LT(0:3),p4LT(0:3)
+      complex*16 m1q,m2q,m3q,m4q
+      common/hparam/ampi
+      double precision ampi,s,sp	
+      double precision masses(4),massesbck(4)
+      complex*16 C0ABC,C0ABD,C0ACD,C0BCD
+      complex*16 D0m
+      complex*16 Dim(3),Dim1(3),Dim2(3)
+      complex*32 D0mq,Dimq(3)
+      complex*16 p1LT2,p2LT2,p3LT2,p4LT2
+      complex*16 x23LT,x12LT
+
+      complex*16 p1C2,p2C2,p3C2,p4C2
+      complex*16 x23C,x12C
+      integer i,k,ifound,disp
+      complex*32 re,im
+      complex*16 k1k1,k1k2,k1k3
+      complex*16 k2k2,k2k3
+      complex*16 k3k3
+
+      double complex c1
+      parameter (c1 = (1.d0,0.d0))
+
+      external dotq
+      real*16 dotq
+
+      external dot
+      real*8 dot
+      external closetomassc
+      complex*32 closetomassc
+
+      
+      external closetomasscd
+      complex*16 closetomasscd
+      complex*16 red
+*------------FsQED
+      external Itot1ovsp_dimreg
+      real*8 Itot1ovsp_dimreg
+
+      external Itotspovsp_dimreg
+      real*8 Itotspovsp_dimreg
+
+      
+      external Itotspovsp_lambdarad
+      real*8 Itotspovsp_lambdarad
+
+      external Itot1ovsp_lambdarad
+      real*8 Itot1ovsp_lambdarad
+
+      real*8 deltauv,lambda2,mu2dim,m2min
+      common/loop/deltauv,lambda2,mu2dim,m2min
+
+      common/momentadisp/momenta
+      double precision momenta(4,0:3)
+
+      external ImD0
+      double complex ImD0
+
+      logical cond
+      double precision timein,timefin
+      p1=momenta(1,:)
+      p2=momenta(2,:)
+      p3=momenta(3,:)
+      p4=momenta(4,:)
+
+      re=(1.q0,0.q0)
+      im=(0.q0,1.q0)
+      red = (1.d0,0.d0)
+      massesbck(1)  = real(m1q)
+      massesbck(2)  = real(m2q)
+      massesbck(3)  = real(m3q)
+      massesbck(4)  = real(m4q)
+
+      k1k1=closetomasscd(dot(k1,k1))
+      k2k2=closetomasscd(dot(k2,k2))
+      k3k3=closetomasscd(dot(k3,k3))
+      
+      do i= 0,3
+         p1LT(i)= k1(i)
+         p2LT(i)= k2(i)-k1(i)
+         p3LT(i)= k3(i)-k2(i)
+         p4LT(i)= -k3(i)
+      enddo
+
+*     
+      
+      p1LT2= closetomasscd(dot(p1LT,p1LT))
+      p2LT2= closetomasscd(dot(p2LT,p2LT))
+      p3LT2= closetomasscd(dot(p3LT,p3LT))
+      p4LT2= closetomasscd(dot(p4LT,p4LT))
+      
+      x12LT= closetomasscd(dot(k2,k2))
+      x23LT= closetomasscd(dot(k3-k1,k3-k1))
+!!!!!!!!!!!!!!!!!!!!LT non sa nulla di k1k2, lo riscrive partendo da P2LT2-m1^2-m2^2, lo faccio anche qui
+
+      k1k2 = -(p2LT2-k1k1-k2k2)/2.d0
+      k1k3 = -(x23LT-k1k1-k3k3)/2.d0
+      k2k3 = -(p3LT2-k3k3-k2k2)/2.d0
+!!!!!!!!!!!!!!!!!!!!
+
+      p1C2 = p1LT2*1.d0
+      p2C2 = p2LT2*1.d0
+      p3C2 = p3LT2*1.d0
+      p4C2 = p4LT2*1.d0
+
+      x12C = x12LT*1.d0
+      x23C = x23LT*1.d0
+
+      if(disp.eq.2) then
+
+         D0m   = (1.d0,0.d0)
+         C0ABC = (0.d0,0.d0)
+         C0ABD = (0.d0,0.d0)
+         C0BCD = (0.d0,0.d0)
+         C0ACD = (0.d0,0.d0)
+!     Se la D0 non è IR, qui restituisci 0
+         call D0IRyon(k1,k2,k3,m1q,m2q,m3q,m4q,cond,pi,pf)
+         if(.not.cond) then
+            D0m=(0.d0,0.d0)
+            Dim(1)=(0.d0,0.d0)
+            Dim(2)=(0.d0,0.d0)
+            Dim(3)=(0.d0,0.d0)
+            return
+         endif
+*------------------------------------------
+         
+         include 'pipirad/decomposition5pt/Di.F'
+*------------QUI L'UNICA M^2 CHE PUÒ ESSERE > 4M_PI^2 È QUELLA DISPERSIVA
+         Dim1= Dim
+         
+         do i=1,4
+            if (massesbck(i).ge.4.d0*ampi**2) then
+               ifound = i
+               if (i.eq.1) m1q = 0.d0
+               if (i.eq.2) m2q = 0.d0
+               if (i.eq.3) m3q = 0.d0
+               if (i.eq.4) m4q = 0.d0
+            endif
+         enddo
+         D0m   = (1.d0,0.d0)
+         include 'pipirad/decomposition5pt/Di.F'
+         Dim2= Dim
+         
+!--------QUI ORA RESTITUISCO L'INTEGRALE DISPERSIVO TENENDO CONTO CHE Dim2 \propto s'  
+         Dim = ((Dim1-Dim2)*Itotspovsp_lambdarad(pi,pf,s,lambda2)
+     >        /massesbck(ifound)   +
+     >        Dim2*Itot1ovsp_lambdarad(pi,pf,s,lambda2))*im
+!--------LA D0 NEI BOX (CHE È DOVE CHIAMO QUESTA ROUTINE) NON È MAI MOLTIPLICATA PER S'
+         D0m = Itot1ovsp_lambdarad(pi,pf,s,lambda2)*im
+         m1q  =  massesbck(1)*(1.d0,0.d0)
+         m2q  =  massesbck(2)*(1.d0,0.d0)
+         m3q  =  massesbck(3)*(1.d0,0.d0)
+         m4q  =  massesbck(4)*(1.d0,0.d0)
+         return
+      elseif((disp.eq.1).or.(disp.eq.3)
+     >        .or.(disp.eq.4).or.(disp.eq.6)) then
+#ifdef COLLIER
+         
+         call D0_cll(D0m,p1C2*c1,p2C2*c1,p3C2*c1,p4C2*c1,x12C*c1,
+     >        x23C*c1,m1q*c1,m2q*c1,m3q*c1,m4q*c1)
+
+         call C0_cll(C0ABC,p1C2,p2C2,x12C,m1q,m2q,m3q)
+
+         call C0_cll(C0ACD,x12C,p3C2,p4C2,m1q,m3q,m4q)
+
+         call C0_cll(C0ABD,p1C2,x23C,p4C2,m1q,m2q,m4q)
+
+         call C0_cll(C0BCD,p2C2,p3C2,x23C,m2q,m3q,m4q)
+
+#endif
+         if((disp.eq.3).or.(disp.eq.6)) then
+            do i=1,4
+               if (massesbck(i).ge.4.d0*ampi**2) then
+                  ifound = i
+                  sp = massesbck(i)
+               endif
+            enddo
+
+            D0m = (D0m - CONJG(D0m))/2.d0
+!!!   Here i subtract from the D0 (checking if it is IR)
+!!!   the imaginary part the Im coming from the cut
+!!!   that originates the behaviour 1/(eta-s') which is integrated analitically
+!!!   I do this because in a 2->3 process there are other (finite) cuts contributing to Im
+
+            call D0IRyon(k1,k2,k3,m1q,m2q,m3q,m4q,cond,pi,pf)
+
+            if(cond) then
+               D0m = D0m - ImD0(pi,pf,s,sp,lambda2)
+            endif
+            
+            C0ABC = (C0ABC - CONJG(C0ABC))/2.d0
+            C0ACD = (C0ACD - CONJG(C0ACD))/2.d0
+            C0ABD = (C0ABD - CONJG(C0ABD))/2.d0
+            C0BCD = (C0BCD - CONJG(C0BCD))/2.d0
+
+c     Se disp=6 voglio le Pave in s' ma voglio i coefficienti in \eta
+            if(disp.eq.6) then
+               do i=1,4
+                  if (massesbck(i).ge.4.d0*ampi**2) then
+                     if (i.eq.1) m1q = s
+                     if (i.eq.2) m2q = s
+                     if (i.eq.3) m3q = s
+                     if (i.eq.4) m4q = s
+                  endif
+               enddo
+            endif
+         endif
+
+c     Se disp=4 voglio le Pave in s' ma voglio i coefficienti in \eta
+         if(disp.eq.4) then
+            do i=1,4
+               if (massesbck(i).ge.4.d0*ampi**2) then
+                  if (i.eq.1) m1q = s
+                  if (i.eq.2) m2q = s
+                  if (i.eq.3) m3q = s
+                  if (i.eq.4) m4q = s
+               endif
+            enddo
+         endif
+
+         include 'pipirad/decomposition5pt/Di.F'
+
+c$$$         if(disp.eq.1) then
+c$$$            do i=1,4
+c$$$               if (massesbck(i).ge.4.d0*ampi**2) then
+c$$$                  if(abs(massesbck(i)/s-1.d0).le.1d-3) then
+c$$$                     call Di(k1,k2,k3,m1q*re,m2q*re,
+c$$$     >                    m3q*re,m4q*re,D0mq,Dimq)
+c$$$                     D0m=D0mq
+c$$$                     Dim=Dimq
+c$$$                  endif
+c$$$               endif
+c$$$            enddo
+c$$$         endif
+
+c     go back to original masses value
+         m1q  =  massesbck(1)*(1.d0,0.d0)
+         m2q  =  massesbck(2)*(1.d0,0.d0)
+         m3q  =  massesbck(3)*(1.d0,0.d0)
+         m4q  =  massesbck(4)*(1.d0,0.d0)
+         
+         return
+      elseif(disp.eq.5) then
+         D0m   = (1.d0,0.d0)
+         C0ABC = (0.d0,0.d0)
+         C0ABD = (0.d0,0.d0)
+         C0BCD = (0.d0,0.d0)
+         C0ACD = (0.d0,0.d0)
+!     Se la D0 non è IR, qui restituisci 0
+         call D0IRyon(k1,k2,k3,m1q,m2q,m3q,m4q,cond,pi,pf)
+         if(.not.cond) then
+            D0m=(0.d0,0.d0)
+            Dim(1)=(0.d0,0.d0)
+            Dim(2)=(0.d0,0.d0)
+            Dim(3)=(0.d0,0.d0)
+            return
+         endif
+
+         if(cond) then
+            D0m=Itot1ovsp_lambdarad(pi,pf,s,lambda2)*im
+         endif
+*------------------------------------------
+         do i=1,4
+            if (massesbck(i).ge.4.d0*ampi**2) then
+               ifound = i
+               if (i.eq.1) m1q = s
+               if (i.eq.2) m2q = s
+               if (i.eq.3) m3q = s
+               if (i.eq.4) m4q = s
+            endif
+         enddo
+
+         include 'pipirad/decomposition5pt/Di.F'
+
+         m1q  =  massesbck(1)*(1.d0,0.d0)
+         m2q  =  massesbck(2)*(1.d0,0.d0)
+         m3q  =  massesbck(3)*(1.d0,0.d0)
+         m4q  =  massesbck(4)*(1.d0,0.d0)
+         return
+      endif
+
+      end
+
+      subroutine Eij_disp(k1,k2,k3,k4,m1q,m2q,m3q,m4q,m5q,
+     >     s,disp,E0m,Eim,Eijm)
+#ifdef COLLIER
+      use collier
+#endif      
+!     implicit none
+      implicit complex*16 (u-w) !cambiato
+      double precision k1(0:3),k2(0:3),k3(0:3),k4(0:3)
+      double precision p1LT(0:3),p2LT(0:3),p3LT(0:3),p4LT(0:3),p5LT(0:3)
+      double precision pi(0:3),pf(0:3)
+      complex*16 m1q,m2q,m3q,m4q,m5q
+      complex*16 mbck
+      double precision masses(5)
+      common/hparam/ampi
+      double precision ampi,s,sp	
+      complex*16 E0m,E1m,E2m,E3m,E4m
+      complex*16 E11,E12,E13,E14
+      complex*16 E22,E23,E24
+      complex*16 E33,E34
+      complex*16 E44
+      complex*16 den,den1,den2,den3,den4,den5 !! cambiato
+      complex*16 Eim(4),Eijm(11)
+      complex*32 E0mq,Eimq(4),Eijmq(11)
+      complex*16 D0ax51LTp2LT2p3LT2p4LT2x34LTx23LTm5qm2qm3qm4q
+      complex*16 D0ax12LTp3LT2p4LT2p5LT2x45LTx34LTm1qm3qm4qm5q
+      complex*16 D0ap1LT2x23LTp4LT2p5LT2x45LTx51LTm1qm2qm4qm5q
+      complex*16 D0ap1LT2p2LT2x34LTp5LT2x12LTx51LTm1qm2qm3qm5q
+      complex*16 D0ap1LT2p2LT2p3LT2x45LTx12LTx23LTm1qm2qm3qm4q
+
+      complex*16 C0ap1LT2p2LT2x12LTm1qm2qm3q
+      complex*16 C0ap1LT2x23LTx45LTm1qm2qm4q
+      complex*16 C0ap1LT2x51LTp5LT2m1qm2qm5q
+      complex*16 C0ax12LTp3LT2x45LTm1qm3qm4q
+      complex*16 C0ax12LTx34LTp5LT2m1qm3qm5q
+      complex*16 C0ax23LTp2LT2p3LT2m4qm2qm3q
+      complex*16 C0ax34LTp3LT2p4LT2m5qm3qm4q
+      complex*16 C0ax45LTp4LT2p5LT2m1qm4qm5q
+      complex*16 C0ax51LTp2LT2x34LTm5qm2qm3q
+      complex*16 C0ax51LTx23LTp4LT2m5qm2qm4q      
+
+      complex*16 p1LT2,p2LT2,p3LT2,p4LT2,p5LT2 !!
+      complex*16 x12LT,x23LT,x34LT,x45LT,x51LT !!
+      complex*16 p1C2,p2C2,p3C2,p4C2,p5C2 
+      complex*16 x12C,x23C,x34C,x45C,x51C
+      integer i,ifound
+      complex*32 re,im
+      complex*16 k1k1,k1k2,k1k3,k1k4 !!
+      complex*16 k2k2,k2k3,k2k4 !!
+      complex*16 k3k3,k3k4 !!
+      complex*16 k4k4 !!
+      
+      external dotq
+      real*16 dotq
+
+      external dot
+      real*8 dot
+      external closetomassc
+      complex*32 closetomassc
+      external closetomasscd
+      complex*16 closetomasscd
+      complex*16 red
+      double complex c1
+      parameter (c1 = (1.d0,0.d0))
+
+      complex*16 enpi(0:0,0:0,0:0,0:0,0:0)
+      complex*16 enpiuv(0:0,0:0,0:0,0:0,0:0)
+
+      
+*------------FsQED
+      
+      common/gvmdchecks/iscoll,fscoll
+      integer iscoll,fscoll
+      
+      external Itot1ovsp_dimreg
+      real*8 Itot1ovsp_dimreg
+
+      external Itotspovsp_dimreg
+      real*8 Itotspovsp_dimreg
+
+      
+      external Itotspovsp_lambdarad
+      real*8 Itotspovsp_lambdarad
+
+      external Itot1ovsp_lambdarad
+      real*8 Itot1ovsp_lambdarad
+
+      real*8 deltauv,lambda2,mu2dim,m2min
+      common/loop/deltauv,lambda2,mu2dim,m2min
+
+      common/momentadisp/momenta
+      double precision momenta(4,0:3)
+
+      external ImD0
+      double complex ImD0
+
+      logical cond
+      integer disp
+      double complex setrez
+
+      double precision timein,timefin
+      masses(1)  = real(m1q)
+      masses(2)  = real(m2q)
+      masses(3)  = real(m3q)
+      masses(4)  = real(m4q)
+      masses(5)  = real(m5q)
+      
+      D0ax51LTp2LT2p3LT2p4LT2x34LTx23LTm5qm2qm3qm4q = (0.d0, 0.d0)
+      D0ax12LTp3LT2p4LT2p5LT2x45LTx34LTm1qm3qm4qm5q = (0.d0, 0.d0)
+      D0ap1LT2x23LTp4LT2p5LT2x45LTx51LTm1qm2qm4qm5q = (0.d0, 0.d0)
+      D0ap1LT2p2LT2x34LTp5LT2x12LTx51LTm1qm2qm3qm5q = (0.d0, 0.d0)
+      D0ap1LT2p2LT2p3LT2x45LTx12LTx23LTm1qm2qm3qm4q = (0.d0, 0.d0)
+
+      C0ap1LT2p2LT2x12LTm1qm2qm3q = (0.d0, 0.d0)
+      C0ap1LT2x23LTx45LTm1qm2qm4q = (0.d0, 0.d0)
+      C0ap1LT2x51LTp5LT2m1qm2qm5q = (0.d0, 0.d0)
+      C0ax12LTp3LT2x45LTm1qm3qm4q = (0.d0, 0.d0)
+      C0ax12LTx34LTp5LT2m1qm3qm5q = (0.d0, 0.d0)
+      C0ax23LTp2LT2p3LT2m4qm2qm3q = (0.d0, 0.d0)
+      C0ax34LTp3LT2p4LT2m5qm3qm4q = (0.d0, 0.d0)
+      C0ax45LTp4LT2p5LT2m1qm4qm5q = (0.d0, 0.d0)
+      C0ax51LTp2LT2x34LTm5qm2qm3q = (0.d0, 0.d0)
+      C0ax51LTx23LTp4LT2m5qm2qm4q = (0.d0, 0.d0)
+
+      
+      re=(1.q0,0.q0)
+      im=(0.q0,1.q0)
+      red = (1.d0,0.d0)
+
+      k1k1=closetomasscd(dot(k1,k1))
+      k2k2=closetomasscd(dot(k2,k2))
+      k3k3=closetomasscd(dot(k3,k3))
+      k4k4=closetomasscd(dot(k4,k4))
+
+      do i= 0,3
+         p1LT(i)= k1(i)
+         p2LT(i)= k2(i)-k1(i)
+         p3LT(i)= k3(i)-k2(i)
+         p4LT(i)= k4(i)-k3(i)
+         p5LT(i)= -k4(i)
+      enddo
+
+*     
+
+      p1LT2= closetomasscd(dot(p1LT,p1LT))
+      p2LT2= closetomasscd(dot(p2LT,p2LT))
+      p3LT2= closetomasscd(dot(p3LT,p3LT))
+      p4LT2= closetomasscd(dot(p4LT,p4LT))
+      p5LT2= closetomasscd(dot(p5LT,p5LT))
+      
+      x12LT= closetomasscd(dot(k2,k2))
+      x23LT= closetomasscd(dot(k3-k1,k3-k1))
+      x34LT= closetomasscd(dot(k4-k2,k4-k2))
+      x45LT= closetomasscd(dot(k3,k3))
+      x51LT= closetomasscd(dot(k1-k4,k1-k4))
+
+      p1C2 = p1LT2*1.d0
+      p2C2 = p2LT2*1.d0
+      p3C2 = p3LT2*1.d0
+      p4C2 = p4LT2*1.d0
+      p5C2 = p5LT2*1.d0
+
+      
+      x12C = x12LT*1.d0
+      x23C = x23LT*1.d0
+      x34C = x34LT*1.d0
+      x45C = x45LT*1.d0
+      x51C = x51LT*1.d0
+!!!!!!!!!!!!!!!!!!!!LT non sa nulla di kikj
+      
+      k1k2 = -(p2LT2-k1k1-k2k2)/2.d0
+      k1k3 = -(x23LT-k1k1-k3k3)/2.d0
+      k1k4 = -(x51LT-k1k1-k4k4)/2.d0
+      k2k3 = -(p3LT2-k3k3-k2k2)/2.d0
+      k2k4 = -(x34LT-k2k2-k4k4)/2.d0
+      k3k4 = -(p4LT2-k3k3-k4k4)/2.d0
+
+      D0ax51LTp2LT2p3LT2p4LT2x34LTx23LTm5qm2qm3qm4q = (0.d0,0.d0)
+      D0ax12LTp3LT2p4LT2p5LT2x45LTx34LTm1qm3qm4qm5q = (0.d0,0.d0)
+      D0ap1LT2x23LTp4LT2p5LT2x45LTx51LTm1qm2qm4qm5q = (0.d0,0.d0)
+      D0ap1LT2p2LT2x34LTp5LT2x12LTx51LTm1qm2qm3qm5q = (0.d0,0.d0)
+      D0ap1LT2p2LT2p3LT2x45LTx12LTx23LTm1qm2qm3qm4q = (0.d0,0.d0)
+
+      C0ap1LT2p2LT2x12LTm1qm2qm3q = (0.d0,0.d0)
+      C0ap1LT2x23LTx45LTm1qm2qm4q = (0.d0,0.d0)
+      C0ap1LT2x51LTp5LT2m1qm2qm5q = (0.d0,0.d0)
+      C0ax12LTp3LT2x45LTm1qm3qm4q = (0.d0,0.d0)
+      C0ax12LTx34LTp5LT2m1qm3qm5q = (0.d0,0.d0)
+      C0ax23LTp2LT2p3LT2m4qm2qm3q = (0.d0,0.d0)
+      C0ax34LTp3LT2p4LT2m5qm3qm4q = (0.d0,0.d0)
+      C0ax45LTp4LT2p5LT2m1qm4qm5q = (0.d0,0.d0)
+      C0ax51LTp2LT2x34LTm5qm2qm3q = (0.d0,0.d0)
+      C0ax51LTx23LTp4LT2m5qm2qm4q = (0.d0,0.d0)
+
+!     Classica decomposizione di loop
+      if(disp.eq.1) then
+#ifdef COLLIER
+
+         call D0_cll(D0ax51LTp2LT2p3LT2p4LT2x34LTx23LTm5qm2qm3qm4q,
+     >        c1*x51C,c1*p2C2,c1*p3C2,c1*p4C2,c1*x34C,c1*x23C,
+     >        c1*m5q,c1*m2q,c1*m3q,c1*m4q)
+         call D0_cll(D0ax12LTp3LT2p4LT2p5LT2x45LTx34LTm1qm3qm4qm5q
+     >        ,c1*x12C,c1*p3C2,c1*p4C2,c1*p5C2,c1*x45C,c1*x34C,
+     >        c1*m1q,c1*m3q,c1*m4q,c1*m5q)
+         call D0_cll(D0ap1LT2x23LTp4LT2p5LT2x45LTx51LTm1qm2qm4qm5q
+     >        ,c1*p1C2,c1*x23C,c1*p4C2,c1*p5C2,c1*x45C,c1*x51C,
+     >        c1*m1q,c1*m2q,c1*m4q,c1*m5q)
+         call D0_cll(D0ap1LT2p2LT2x34LTp5LT2x12LTx51LTm1qm2qm3qm5q,
+     >        c1*p1C2,c1*p2C2,c1*x34C,c1*p5C2,c1*x12C,c1*x51C,
+     >        c1*m1q,c1*m2q,c1*m3q,c1*m5q)
+         call D0_cll(D0ap1LT2p2LT2p3LT2x45LTx12LTx23LTm1qm2qm3qm4q,
+     >        c1*p1C2,c1*p2C2,c1*p3C2,c1*x45C,c1*x12C,c1*x23C,
+     >        c1*m1q,c1*m2q,c1*m3q,c1*m4q)
+
+         call C0_cll(C0ap1LT2p2LT2x12LTm1qm2qm3q,
+     >        c1*p1C2,c1*p2C2,c1*x12C,c1*m1q,c1*m2q,c1*m3q)
+         call C0_cll(C0ap1LT2x23LTx45LTm1qm2qm4q,
+     >        c1*p1C2,c1*x23C,c1*x45C,c1*m1q,c1*m2q,c1*m4q)
+         call C0_cll(C0ap1LT2x51LTp5LT2m1qm2qm5q,
+     >        c1*p1C2,c1*x51C,c1*p5C2,c1*m1q,c1*m2q,c1*m5q)
+         call C0_cll(C0ax12LTp3LT2x45LTm1qm3qm4q,
+     >        c1*x12C,c1*p3C2,c1*x45C,c1*m1q,c1*m3q,c1*m4q)
+         call C0_cll(C0ax12LTx34LTp5LT2m1qm3qm5q,
+     >        c1*x12C,c1*x34C,c1*p5C2,c1*m1q,c1*m3q,c1*m5q)
+         call C0_cll(C0ax23LTp2LT2p3LT2m4qm2qm3q,
+     >        c1*x23C,c1*p2C2,c1*p3C2,c1*m4q,c1*m2q,c1*m3q)
+         call C0_cll(C0ax34LTp3LT2p4LT2m5qm3qm4q,
+     >        c1*x34C,c1*p3C2,c1*p4C2,c1*m5q,c1*m3q,c1*m4q)
+         call C0_cll(C0ax45LTp4LT2p5LT2m1qm4qm5q,
+     >        c1*x45C,c1*p4C2,c1*p5C2,c1*m1q,c1*m4q,c1*m5q)
+         call C0_cll(C0ax51LTp2LT2x34LTm5qm2qm3q,
+     >        c1*x51C,c1*p2C2,c1*x34C,c1*m5q,c1*m2q,c1*m3q)
+         call C0_cll(C0ax51LTx23LTp4LT2m5qm2qm4q,
+     >        c1*x51C,c1*x23C,c1*p4C2,c1*m5q,c1*m2q,c1*m4q)
+#endif
+         
+      elseif(disp.eq.2) then
+!     Check quali D0 sono IR e sostituisci D0 con \int ds'/s' Im D0
+!     e portano polo 1/(\eta-s')
+         call D0IRyon(k1-k4,k2-k4,k3-k4,m5q,m2q,m3q,m4q,cond,pi,pf)
+         if(cond) then
+            D0ax51LTp2LT2p3LT2p4LT2x34LTx23LTm5qm2qm3qm4q=
+     >           Itot1ovsp_lambdarad(pi,pf,s,lambda2)*im
+         endif
+
+         call D0IRyon(k2,k3,k4,m1q,m3q,m4q,m5q,cond,pi,pf)
+         if(cond) then
+            D0ax12LTp3LT2p4LT2p5LT2x45LTx34LTm1qm3qm4qm5q=
+     >           Itot1ovsp_lambdarad(pi,pf,s,lambda2)*im
+         endif
+
+         call D0IRyon(k1,k3,k4,m1q,m2q,m4q,m5q,cond,pi,pf)
+         if(cond) then
+            D0ap1LT2x23LTp4LT2p5LT2x45LTx51LTm1qm2qm4qm5q=
+     >           Itot1ovsp_lambdarad(pi,pf,s,lambda2)*im
+         endif
+         
+         call D0IRyon(k1,k2,k4,m1q,m2q,m3q,m5q,cond,pi,pf)
+         if(cond) then
+            D0ap1LT2p2LT2x34LTp5LT2x12LTx51LTm1qm2qm3qm5q=
+     >           Itot1ovsp_lambdarad(pi,pf,s,lambda2)*im
+         endif
+
+         call D0IRyon(k1,k2,k3,m1q,m2q,m3q,m4q,cond,pi,pf)
+         if(cond) then
+            D0ap1LT2p2LT2p3LT2x45LTx12LTx23LTm1qm2qm3qm4q=
+     >           Itot1ovsp_lambdarad(pi,pf,s,lambda2)*im
+         endif
+
+!     Devo restituire il coefficiente d(\eta)*\int ds'/s' Im D0, quindi devo cambiare il valore della massa dispersiva a \eta (qui nella routine s)
+         do i=1,5
+            if (masses(i).ge.4.d0*ampi**2) then
+               ifound = i
+               if (i.eq.1) m1q = s
+               if (i.eq.2) m2q = s
+               if (i.eq.3) m3q = s
+               if (i.eq.4) m4q = s
+               if (i.eq.5) m5q = s
+            endif
+         enddo
+      elseif(disp.eq.3) then
+!     Restituisce la parte Im di tutto ad eccezione delle D0_IR e polari e delle D0_IR (polari) restituisce
+!     la parte IM sottratta della parte immaginaria che origina dal taglio che diverge a s'=\eta
+
+         do i=1,5
+            if (masses(i).ge.4.d0*ampi**2) then
+               ifound = i
+               sp = masses(i)
+            endif
+         enddo
+
+#ifdef COLLIER
+
+         call D0_cll(D0ax51LTp2LT2p3LT2p4LT2x34LTx23LTm5qm2qm3qm4q,
+     >        c1*x51C,c1*p2C2,c1*p3C2,c1*p4C2,c1*x34C,c1*x23C,
+     >        c1*m5q,c1*m2q,c1*m3q,c1*m4q)
+         call D0_cll(D0ax12LTp3LT2p4LT2p5LT2x45LTx34LTm1qm3qm4qm5q
+     >        ,c1*x12C,c1*p3C2,c1*p4C2,c1*p5C2,c1*x45C,c1*x34C,
+     >        c1*m1q,c1*m3q,c1*m4q,c1*m5q)
+         call D0_cll(D0ap1LT2x23LTp4LT2p5LT2x45LTx51LTm1qm2qm4qm5q
+     >        ,c1*p1C2,c1*x23C,c1*p4C2,c1*p5C2,c1*x45C,c1*x51C,
+     >        c1*m1q,c1*m2q,c1*m4q,c1*m5q)
+         call D0_cll(D0ap1LT2p2LT2x34LTp5LT2x12LTx51LTm1qm2qm3qm5q,
+     >        c1*p1C2,c1*p2C2,c1*x34C,c1*p5C2,c1*x12C,c1*x51C,
+     >        c1*m1q,c1*m2q,c1*m3q,c1*m5q)
+         call D0_cll(D0ap1LT2p2LT2p3LT2x45LTx12LTx23LTm1qm2qm3qm4q,
+     >        c1*p1C2,c1*p2C2,c1*p3C2,c1*x45C,c1*x12C,c1*x23C,
+     >        c1*m1q,c1*m2q,c1*m3q,c1*m4q)
+
+         call C0_cll(C0ap1LT2p2LT2x12LTm1qm2qm3q,
+     >        c1*p1C2,c1*p2C2,c1*x12C,c1*m1q,c1*m2q,c1*m3q)
+         call C0_cll(C0ap1LT2x23LTx45LTm1qm2qm4q,
+     >        c1*p1C2,c1*x23C,c1*x45C,c1*m1q,c1*m2q,c1*m4q)
+         call C0_cll(C0ap1LT2x51LTp5LT2m1qm2qm5q,
+     >        c1*p1C2,c1*x51C,c1*p5C2,c1*m1q,c1*m2q,c1*m5q)
+         call C0_cll(C0ax12LTp3LT2x45LTm1qm3qm4q,
+     >        c1*x12C,c1*p3C2,c1*x45C,c1*m1q,c1*m3q,c1*m4q)
+         call C0_cll(C0ax12LTx34LTp5LT2m1qm3qm5q,
+     >        c1*x12C,c1*x34C,c1*p5C2,c1*m1q,c1*m3q,c1*m5q)
+         call C0_cll(C0ax23LTp2LT2p3LT2m4qm2qm3q,
+     >        c1*x23C,c1*p2C2,c1*p3C2,c1*m4q,c1*m2q,c1*m3q)
+         call C0_cll(C0ax34LTp3LT2p4LT2m5qm3qm4q,
+     >        c1*x34C,c1*p3C2,c1*p4C2,c1*m5q,c1*m3q,c1*m4q)
+         call C0_cll(C0ax45LTp4LT2p5LT2m1qm4qm5q,
+     >        c1*x45C,c1*p4C2,c1*p5C2,c1*m1q,c1*m4q,c1*m5q)
+         call C0_cll(C0ax51LTp2LT2x34LTm5qm2qm3q,
+     >        c1*x51C,c1*p2C2,c1*x34C,c1*m5q,c1*m2q,c1*m3q)
+         call C0_cll(C0ax51LTx23LTp4LT2m5qm2qm4q,
+     >        c1*x51C,c1*x23C,c1*p4C2,c1*m5q,c1*m2q,c1*m4q)
+
+#endif
+!     Just the imaginary part
+         
+         D0ax51LTp2LT2p3LT2p4LT2x34LTx23LTm5qm2qm3qm4q = 
+     >        setrez(D0ax51LTp2LT2p3LT2p4LT2x34LTx23LTm5qm2qm3qm4q)
+
+         D0ax12LTp3LT2p4LT2p5LT2x45LTx34LTm1qm3qm4qm5q = 
+     >        setrez(D0ax12LTp3LT2p4LT2p5LT2x45LTx34LTm1qm3qm4qm5q)
+
+         D0ap1LT2x23LTp4LT2p5LT2x45LTx51LTm1qm2qm4qm5q = 
+     >        setrez(D0ap1LT2x23LTp4LT2p5LT2x45LTx51LTm1qm2qm4qm5q)
+
+         D0ap1LT2p2LT2x34LTp5LT2x12LTx51LTm1qm2qm3qm5q = 
+     >        setrez(D0ap1LT2p2LT2x34LTp5LT2x12LTx51LTm1qm2qm3qm5q)
+
+         D0ap1LT2p2LT2p3LT2x45LTx12LTx23LTm1qm2qm3qm4q = 
+     >        setrez(D0ap1LT2p2LT2p3LT2x45LTx12LTx23LTm1qm2qm3qm4q)
+
+         C0ap1LT2p2LT2x12LTm1qm2qm3q = 
+     >        setrez(C0ap1LT2p2LT2x12LTm1qm2qm3q)
+
+         C0ap1LT2x23LTx45LTm1qm2qm4q = 
+     >        setrez(C0ap1LT2x23LTx45LTm1qm2qm4q)
+
+         C0ap1LT2x51LTp5LT2m1qm2qm5q = 
+     >        setrez(C0ap1LT2x51LTp5LT2m1qm2qm5q)
+
+         C0ax12LTp3LT2x45LTm1qm3qm4q = 
+     >        setrez(C0ax12LTp3LT2x45LTm1qm3qm4q)
+
+         C0ax12LTx34LTp5LT2m1qm3qm5q = 
+     >        setrez(C0ax12LTx34LTp5LT2m1qm3qm5q)
+
+         C0ax23LTp2LT2p3LT2m4qm2qm3q = 
+     >        setrez(C0ax23LTp2LT2p3LT2m4qm2qm3q)
+
+         C0ax34LTp3LT2p4LT2m5qm3qm4q = 
+     >        setrez(C0ax34LTp3LT2p4LT2m5qm3qm4q)
+
+         C0ax45LTp4LT2p5LT2m1qm4qm5q = 
+     >        setrez(C0ax45LTp4LT2p5LT2m1qm4qm5q)
+
+         C0ax51LTp2LT2x34LTm5qm2qm3q = 
+     >        setrez(C0ax51LTp2LT2x34LTm5qm2qm3q)
+
+         C0ax51LTx23LTp4LT2m5qm2qm4q = 
+     >        setrez(C0ax51LTx23LTp4LT2m5qm2qm4q)
+        
+         call D0IRyon(k1-k4,k2-k4,k3-k4,m5q,m2q,m3q,m4q,cond,pi,pf)
+         if(cond) then
+            D0ax51LTp2LT2p3LT2p4LT2x34LTx23LTm5qm2qm3qm4q=
+     >           D0ax51LTp2LT2p3LT2p4LT2x34LTx23LTm5qm2qm3qm4q
+     >           -ImD0(pi,pf,s,sp,lambda2)
+         endif
+
+         call D0IRyon(k2,k3,k4,m1q,m3q,m4q,m5q,cond,pi,pf)
+         if(cond) then
+            D0ax12LTp3LT2p4LT2p5LT2x45LTx34LTm1qm3qm4qm5q=
+     >           D0ax12LTp3LT2p4LT2p5LT2x45LTx34LTm1qm3qm4qm5q
+     >           -ImD0(pi,pf,s,sp,lambda2)
+         endif
+
+         call D0IRyon(k1,k3,k4,m1q,m2q,m4q,m5q,cond,pi,pf)
+         if(cond) then
+            D0ap1LT2x23LTp4LT2p5LT2x45LTx51LTm1qm2qm4qm5q=
+     >           D0ap1LT2x23LTp4LT2p5LT2x45LTx51LTm1qm2qm4qm5q
+     >           -ImD0(pi,pf,s,sp,lambda2)
+         endif
+         
+         call D0IRyon(k1,k2,k4,m1q,m2q,m3q,m5q,cond,pi,pf)
+         if(cond) then
+            D0ap1LT2p2LT2x34LTp5LT2x12LTx51LTm1qm2qm3qm5q=
+     >           D0ap1LT2p2LT2x34LTp5LT2x12LTx51LTm1qm2qm3qm5q
+     >           -ImD0(pi,pf,s,sp,lambda2)
+         endif
+
+         call D0IRyon(k1,k2,k3,m1q,m2q,m3q,m4q,cond,pi,pf)
+         if(cond) then
+            D0ap1LT2p2LT2p3LT2x45LTx12LTx23LTm1qm2qm3qm4q=
+     >           D0ap1LT2p2LT2p3LT2x45LTx12LTx23LTm1qm2qm3qm4q
+     >           -ImD0(pi,pf,s,sp,lambda2)
+         endif
+
+
+         do i=1,5
+            if (masses(i).ge.4.d0*ampi**2) then
+               ifound = i
+               if (i.eq.1) m1q = s
+               if (i.eq.2) m2q = s
+               if (i.eq.3) m3q = s
+               if (i.eq.4) m4q = s
+               if (i.eq.5) m5q = s
+            endif
+         enddo
+      elseif(disp.eq.4) then
+
+#ifdef COLLIER
+
+         call D0_cll(D0ax51LTp2LT2p3LT2p4LT2x34LTx23LTm5qm2qm3qm4q,
+     >        c1*x51C,c1*p2C2,c1*p3C2,c1*p4C2,c1*x34C,c1*x23C,
+     >        c1*m5q,c1*m2q,c1*m3q,c1*m4q)
+         call D0_cll(D0ax12LTp3LT2p4LT2p5LT2x45LTx34LTm1qm3qm4qm5q
+     >        ,c1*x12C,c1*p3C2,c1*p4C2,c1*p5C2,c1*x45C,c1*x34C,
+     >        c1*m1q,c1*m3q,c1*m4q,c1*m5q)
+         call D0_cll(D0ap1LT2x23LTp4LT2p5LT2x45LTx51LTm1qm2qm4qm5q
+     >        ,c1*p1C2,c1*x23C,c1*p4C2,c1*p5C2,c1*x45C,c1*x51C,
+     >        c1*m1q,c1*m2q,c1*m4q,c1*m5q)
+         call D0_cll(D0ap1LT2p2LT2x34LTp5LT2x12LTx51LTm1qm2qm3qm5q,
+     >        c1*p1C2,c1*p2C2,c1*x34C,c1*p5C2,c1*x12C,c1*x51C,
+     >        c1*m1q,c1*m2q,c1*m3q,c1*m5q)
+         call D0_cll(D0ap1LT2p2LT2p3LT2x45LTx12LTx23LTm1qm2qm3qm4q,
+     >        c1*p1C2,c1*p2C2,c1*p3C2,c1*x45C,c1*x12C,c1*x23C,
+     >        c1*m1q,c1*m2q,c1*m3q,c1*m4q)
+
+         call C0_cll(C0ap1LT2p2LT2x12LTm1qm2qm3q,
+     >        c1*p1C2,c1*p2C2,c1*x12C,c1*m1q,c1*m2q,c1*m3q)
+         call C0_cll(C0ap1LT2x23LTx45LTm1qm2qm4q,
+     >        c1*p1C2,c1*x23C,c1*x45C,c1*m1q,c1*m2q,c1*m4q)
+         call C0_cll(C0ap1LT2x51LTp5LT2m1qm2qm5q,
+     >        c1*p1C2,c1*x51C,c1*p5C2,c1*m1q,c1*m2q,c1*m5q)
+         call C0_cll(C0ax12LTp3LT2x45LTm1qm3qm4q,
+     >        c1*x12C,c1*p3C2,c1*x45C,c1*m1q,c1*m3q,c1*m4q)
+         call C0_cll(C0ax12LTx34LTp5LT2m1qm3qm5q,
+     >        c1*x12C,c1*x34C,c1*p5C2,c1*m1q,c1*m3q,c1*m5q)
+         call C0_cll(C0ax23LTp2LT2p3LT2m4qm2qm3q,
+     >        c1*x23C,c1*p2C2,c1*p3C2,c1*m4q,c1*m2q,c1*m3q)
+         call C0_cll(C0ax34LTp3LT2p4LT2m5qm3qm4q,
+     >        c1*x34C,c1*p3C2,c1*p4C2,c1*m5q,c1*m3q,c1*m4q)
+         call C0_cll(C0ax45LTp4LT2p5LT2m1qm4qm5q,
+     >        c1*x45C,c1*p4C2,c1*p5C2,c1*m1q,c1*m4q,c1*m5q)
+         call C0_cll(C0ax51LTp2LT2x34LTm5qm2qm3q,
+     >        c1*x51C,c1*p2C2,c1*x34C,c1*m5q,c1*m2q,c1*m3q)
+         call C0_cll(C0ax51LTx23LTp4LT2m5qm2qm4q,
+     >        c1*x51C,c1*x23C,c1*p4C2,c1*m5q,c1*m2q,c1*m4q)
+
+#endif
+         
+         do i=1,5
+            if (masses(i).ge.4.d0*ampi**2) then
+               ifound = i
+               if (i.eq.1) m1q = s
+               if (i.eq.2) m2q = s
+               if (i.eq.3) m3q = s
+               if (i.eq.4) m4q = s
+               if (i.eq.5) m5q = s
+            endif
+         enddo
+
+         
+      endif
+
+
+      include 'pipirad/decomposition5pt/assignements.f'
+
+!!!!!!!E0!!!!!!!!
+
+      include 'pipirad/decomposition5pt/E0.F'
+
+!!!!!!!Ei!!!!!!!!
+
+      include 'pipirad/decomposition5pt/Ei.F'
+      
+!!!!!!Eij!!!!!!!!
+      
+      include 'pipirad/decomposition5pt/Eij.F'
+      
+!!!!!!!Ritorno ai valori nominali delle masse perchè per qualche valore
+!!!!!!!di disp, modifico i valori
+      
+      m1q  =  masses(1)*(1.d0,0.d0)
+      m2q  =  masses(2)*(1.d0,0.d0)
+      m3q  =  masses(3)*(1.d0,0.d0)
+      m4q  =  masses(4)*(1.d0,0.d0)
+      m5q  =  masses(5)*(1.d0,0.d0)
+      
+      return
+      end
+      
+
+
+*-----------------------------------------
+      function lambdad(s,sp,ph2)
+      implicit none
+      real*8 lambdad
+      real*8 s,sp,ph2
+
+      lambdad=(s-sp+ph2)**2-4.d0*s*ph2
+      return
+      end
+*-----------------------------------------      
+      function ImD0(p1,p3,s,sp,ph2)
+      implicit none
+      real*8 p1,p3
+      dimension p1(0:3),p3(0:3)
+      double complex ImD0
+      real*8 ame,ammu,convfac,alpha,pi,ampi
+      common/parameters/ame,ammu,convfac,alpha,pi
+      common/hparam/ampi
+      
+      real*8 mp2,me2,f,ph2,t,s,sp
+      real*8 argsqrt,num,den
+
+      double complex im
+      
+      real*8 dot
+      external dot
+
+      external lambdad
+      real*8 lambdad
+
+      if(sp.ge.(s+ph2-2.d0*dsqrt(s)*dsqrt(ph2))) then
+         ImD0= (0.d0,0.d0)
+         return
+      endif
+      
+      im = (0.d0,1.d0)
+      mp2=ampi**2
+      me2=ame**2
+
+      t = dot(p1-p3,p1-p3)
+
+      argsqrt = lambdad(s,sp,ph2)*((mp2-me2-t)**2-4.d0*me2*t)
+     >     -4.d0*ph2*sp*s*t
+
+      num = 2.d0*ph2*s*sp+lambdad(s,sp,ph2)*(me2+mp2-t
+     >     +dsqrt(argsqrt/lambdad(s,sp,ph2)))
+
+      den = 2.d0*ph2*s*sp+lambdad(s,sp,ph2)*(me2+mp2-t
+     >     -dsqrt(argsqrt/lambdad(s,sp,ph2)))
+
+      ImD0 = pi/dsqrt(argsqrt)*dlog(num/den)
+
+      ImD0 = ImD0*im
+      return
+      end
+
+      
+      real*8 function Itot1ovsp_lambdarad(p1,p3,s,lambda2)
+      implicit none
+      real*8 p1,p3
+      dimension p1(0:3),p3(0:3)
+      real*8 I2Moretti,s,T,I1moretti
+      real*8 ame,ammu,convfac,alpha,pi,ampi
+      common/parameters/ame,ammu,convfac,alpha,pi
+      common/hparam/ampi
+
+      real*8 p1p3,p1p2,e1,be1,e3,be3,esoft,lambda2
+      complex*16 i13
+
+      real*8 mp2,me2,f
+
+      real*8 num,den
+      real*8 dot
+      external dot
+
+
+      mp2=ampi**2
+      me2=ame**2
+
+      t = dot(p1-p3,p1-p3)
+
+      f= sqrt(t**2+(me2-mp2)**2-2d0*t*(me2+mp2))
+      num=mp2+me2-t+F
+      den=mp2+me2-t-F
+      I2moretti=pi/s*log(s/(4d0*mp2))*1d0/f*log(num/den)
+
+      p1p3=dot(p1,p3)
+      
+      e1 = p1(0)
+      e3 = p3(0)
+
+      be1=sqrt(1.d0-me2/e1**2)
+      be3=sqrt(1.d0-mp2/e3**2)
+      esoft=(s-4*mp2)/(2.d0*sqrt(s))
+
+      call intpipj(pi,p1p3,e1,be1,ame,e3,be3,ampi,esoft,lambda2,i13)
+      I1moretti=real(i13)/p1p3/(4d0*s)
+
+      Itot1ovsp_lambdarad=I1moretti+I2moretti
+
+      return
+      end
+
+
+      real*8 function Itotspovsp_lambdarad(p1,p3,s,lambda2)
+      implicit none
+      real*8 p1,p2,p3,p4
+      dimension p1(0:3),p2(0:3),p3(0:3),p4(0:3)
+      real*8 s,T
+
+      real*8 p1p3,p1p2,e1,be1,e3,be3,esoft,lambda2
+      complex*16 i13
+      real*8 ame,ammu,convfac,alpha,pi,ampi
+      common/parameters/ame,ammu,convfac,alpha,pi
+      common/hparam/ampi
+
+      real*8 me2,mp2
+      real*8 dot
+      external dot
+
+      mp2=ampi**2
+      me2=ame**2
+
+      t = dot(p1-p3,p1-p3)
+
+      p1p3=dot(p1,p3)
+      
+      e1 = p1(0)
+      e3 = p3(0)
+
+      be1=sqrt(1.d0-me2/e1**2)
+      be3=sqrt(1.d0-mp2/e3**2)
+      esoft=(s-4*mp2)/(2.d0*sqrt(s))
+
+      call intpipj(pi,p1p3,e1,be1,ame,e3,be3,ampi,esoft,lambda2,i13)
+      Itotspovsp_lambdarad=real(i13)/p1p3/(4d0)
+
+      return
+      end
+
+
+*** the following were in routines.F in Marco's version
+*********
+      subroutine routing_mumu_old(amme,mmu,pt1,pt2,pt3,pt4,qt,
+     >				 momvec,mominv,masses,i,elmat,ifc)
+
+#ifdef COLLIER
+        use collier
+#endif
+        implicit none
+
+	double precision pt1(0:3),pt2(0:3),pt3(0:3),pt4(0:3),qt(0:3)
+	double precision pt(0:3)
+	real*8 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
+	double precision amme,mmu,s,s1,me2,me4,mm2,mm4
+
+        external vpolc
+        double complex vpolc,alphar
+
+        common/ialpharunning/iarun
+        integer iarun
+
+
+	double complex tens(1:35)
+	double complex tensuv(1:35)
+
+	character*3 ifc
+
+	double complex masses(0:4)
+	double complex mominv(1:10)
+	double complex momvec(0:3,4)
+
+	double precision E0L
+	double precision Evec(0:3)
+	double precision Er2(0:9),Er2m(0:3,0:3)
+	double precision Er3(0:19),Er3m(0:3,0:3,0:3)
+
+	real*8 elmat,elmat1
+
+	integer i,k,l,m,n,o,p
+
+	double precision p1a
+	double precision p2a
+	double precision p3a
+	double precision p4a
+	double precision ka
+
+	double precision gab
+
+	double precision p1ap1b
+	double precision p1ap2b
+	double precision p1ap3b
+	double precision p1ap4b
+	double precision kap1b
+	double precision p2ap2b
+	double precision p2ap3b
+	double precision p2ap4b
+	double precision kap2b
+	double precision p3ap3b
+	double precision p3ap4b
+	double precision kap3b
+	double precision p4ap4b
+	double precision kap4b
+	double precision kakb
+
+	double precision p1ap1bp2c
+	double precision p1ap1bp3c
+	double precision p1ap1bp4c
+	double precision kap1bp1c
+	double precision p1ap2bp2c
+	double precision p1ap2bp3c
+	double precision p1ap2bp4c
+	double precision kap1bp2c
+	double precision p1ap3bp3c
+	double precision p1ap3bp4c
+	double precision kap1bp3c
+	double precision p1ap4bp4c
+	double precision kap1bp4c
+	double precision p2ap2bp3c
+	double precision p2ap2bp4c
+	double precision kap2bp2c
+	double precision p2ap3bp3c
+	double precision p2ap3bp4c
+	double precision kap2bp3c
+	double precision p2ap4bp4c
+	double precision kap2bp4c
+	double precision p3ap3bp4c
+	double precision kap3bp3c
+	double precision p3ap4bp4c
+	double precision kap3bp4c
+	double precision kap4bp4c
+
+	double precision gabkc
+	double precision gabp1c
+	double precision gabp2c
+	double precision gabp3c
+	double precision gabp4c
+
+	external dot
+	double precision dot
+
+
+
+	p1p2 = dot(pt1,pt2)
+	p1p3 = dot(pt1,pt3)
+	p1p4 = dot(pt1,pt4)
+	kp1  = dot(pt1,qt)
+	p2p3 = dot(pt2,pt3)
+	p2p4 = dot(pt2,pt4)
+	kp2  = dot(pt2,qt)
+	kp3 = dot(pt3,qt)
+	p3p4 = dot(pt3,pt4)
+	kp4  = dot(pt4,qt)
+	s=dot(pt1+pt2,pt1+pt2)
+	s1=dot(pt3+pt4,pt3+pt4)
+
+
+
+#ifdef COLLIER
+
+	call Eten_cll(tens,tensuv,momvec,mominv,masses,3)
+
+#endif
+
+
+
+************QUI PRENDIAMO I VARI ELEMENTI DI TENS E ISOLIAMO QUELLO SCALARE, VETTORIALE, TENSORIALE DI RANK2 E 3
+
+	E0L=real(tens(1))
+
+	Evec(0)=real(tens(2))
+	Evec(1)=real(tens(3))
+	Evec(2)=real(tens(4))
+	Evec(3)=real(tens(5))
+
+	Er2(0)=real(tens(6))
+
+	Er2(1)=real(tens(7))
+
+	Er2(2)=real(tens(8))
+
+	Er2(3)=real(tens(9))
+	Er2(4)=real(tens(10))
+	Er2(5)=real(tens(11))
+	Er2(6)=real(tens(12))
+	Er2(7)=real(tens(13))
+	Er2(8)=real(tens(14))
+	Er2(9)=real(tens(15))
+        if(ifc.eq.'is1') print*,'vettoriali',E0L,Evec
+      Er2m(0,0)=Er2(0)
+      Er2m(0,1)=Er2(1)
+      Er2m(1,0)=Er2(1)
+      Er2m(2,0)=Er2(2)
+      Er2m(0,2)=Er2(2)
+      Er2m(3,0)=Er2(3)
+      Er2m(0,3)=Er2(3)
+      Er2m(1,1)=Er2(4)
+      Er2m(1,2)=Er2(5)
+      Er2m(2,1)=Er2(5)
+      Er2m(1,3)=Er2(6)
+      Er2m(3,1)=Er2(6)
+      Er2m(2,2)=Er2(7)
+      Er2m(2,3)=Er2(8)
+      Er2m(3,2)=Er2(8)
+      Er2m(3,3)=Er2(9)
+
+	Er3(0)=real(tens(16))
+	Er3(1)=real(tens(17))
+	Er3(2)=real(tens(18))
+	Er3(3)=real(tens(19))
+	Er3(4)=real(tens(20))
+	Er3(5)=real(tens(21))
+	Er3(6)=real(tens(22))
+	Er3(7)=real(tens(23))
+	Er3(8)=real(tens(24))
+	Er3(9)=real(tens(25))
+	Er3(10)=real(tens(26))
+	Er3(11)=real(tens(27))
+	Er3(12)=real(tens(28))
+	Er3(13)=real(tens(29))
+	Er3(14)=real(tens(30))
+	Er3(15)=real(tens(31))
+	Er3(16)=real(tens(32))
+	Er3(17)=real(tens(33))
+	Er3(18)=real(tens(34))
+	Er3(19)=real(tens(35))
+
+	Er3m(0, 0, 0) = Er3(0)
+	Er3m(0, 0, 1) = Er3(1)
+	Er3m(0, 1, 0) = Er3(1)
+	Er3m(1, 0, 0) = Er3(1)
+	Er3m(0, 0, 2) = Er3(2)
+	Er3m(0, 2, 0) = Er3(2)
+	Er3m(2, 0, 0) = Er3(2)
+	Er3m(0, 0, 3) = Er3(3)
+	Er3m(0, 3, 0) = Er3(3)
+	Er3m(3, 0, 0) = Er3(3)
+	Er3m(0, 1, 1) = Er3(4)
+	Er3m(1, 0, 1) = Er3(4)
+	Er3m(1, 1, 0) = Er3(4)
+	Er3m(0, 1, 2) = Er3(5)
+	Er3m(0, 2, 1) = Er3(5)
+	Er3m(1, 0, 2) = Er3(5)
+	Er3m(1, 2, 0) = Er3(5)
+	Er3m(2, 0, 1) = Er3(5)
+	Er3m(2, 1, 0) = Er3(5)
+	Er3m(0, 1, 3) = Er3(6)
+	Er3m(0, 3, 1) = Er3(6)
+	Er3m(1, 0, 3) = Er3(6)
+	Er3m(1, 3, 0) = Er3(6)
+	Er3m(3, 0, 1) = Er3(6)
+	Er3m(3, 1, 0) = Er3(6)
+	Er3m(0, 2, 2) = Er3(7)
+	Er3m(2, 0, 2) = Er3(7)
+	Er3m(2, 2, 0) = Er3(7)
+	Er3m(0, 2, 3) = Er3(8)
+	Er3m(0, 3, 2) = Er3(8)
+	Er3m(2, 0, 3) = Er3(8)
+	Er3m(2, 3, 0) = Er3(8)
+	Er3m(3, 0, 2) = Er3(8)
+	Er3m(3, 2, 0) = Er3(8)
+	Er3m(0, 3, 3) = Er3(9)
+	Er3m(3, 0, 3) = Er3(9)
+	Er3m(3, 3, 0) = Er3(9)
+	Er3m(1, 1, 1) = Er3(10)
+	Er3m(1, 1, 2) = Er3(11)
+	Er3m(1, 2, 1) = Er3(11)
+	Er3m(2, 1, 1) = Er3(11)
+	Er3m(1, 1, 3) = Er3(12)
+	Er3m(1, 3, 1) = Er3(12)
+	Er3m(3, 1, 1) = Er3(12)
+	Er3m(1, 2, 2) = Er3(13)
+	Er3m(2, 1, 2) = Er3(13)
+	Er3m(2, 2, 1) = Er3(13)
+	Er3m(1, 2, 3) = Er3(14)
+	Er3m(1, 3, 2) = Er3(14)
+	Er3m(2, 1, 3) = Er3(14)
+	Er3m(2, 3, 1) = Er3(14)
+	Er3m(3, 1, 2) = Er3(14)
+	Er3m(3, 2, 1) = Er3(14)
+	Er3m(1, 3, 3) = Er3(15)
+	Er3m(3, 1, 3) = Er3(15)
+	Er3m(3, 3, 1) = Er3(15)
+	Er3m(2, 2, 2) = Er3(16)
+	Er3m(2, 2, 3) = Er3(17)
+	Er3m(2, 3, 2) = Er3(17)
+	Er3m(3, 2, 2) = Er3(17)
+	Er3m(2, 3, 3) = Er3(18)
+	Er3m(3, 2, 3) = Er3(18)
+	Er3m(3, 3, 2) = Er3(18)
+	Er3m(3, 3, 3) = Er3(19)
+
+***************vettoriali
+
+	p1a=dot(pt1,Evec)
+	p2a=dot(pt2,Evec)
+	p3a=dot(pt3,Evec)
+	p4a=dot(pt4,Evec)
+	ka=dot(qt,Evec)
+
+*********rango 2
+
+	call rank2(Er2,pt3,qt,2,gab)
+
+	call rank2(Er2,pt1,pt1,1,p1ap1b)
+
+	call rank2(Er2,pt1,pt2,1,p1ap2b)
+
+	call rank2(Er2,pt1,pt3,1,p1ap3b)
+
+	call rank2(Er2,pt1,pt4,1,p1ap4b)
+
+	call rank2(Er2,pt1,qt,1,kap1b)
+
+	call rank2(Er2,pt2,pt2,1,p2ap2b)
+
+	call rank2(Er2,pt2,pt3,1,p2ap3b)
+
+	call rank2(Er2,pt2,pt4,1,p2ap4b)
+
+	call rank2(Er2,pt2,qt,1,kap2b)
+
+	call rank2(Er2,pt3,pt3,1,p3ap3b)
+
+	call rank2(Er2,pt3,pt4,1,p3ap4b)
+
+	call rank2(Er2,pt3,qt,1,kap3b)
+
+	call rank2(Er2,pt4,pt4,1,p4ap4b)
+
+	call rank2(Er2,pt4,qt,1,kap4b)
+
+	call rank2(Er2,qt,qt,1,kakb)
+
+**********************rango 3
+
+	call rank3(Er3,pt1,pt1,pt2,1,p1ap1bp2c)
+
+	call rank3(Er3,pt1,pt1,pt3,1,p1ap1bp3c)
+
+	call rank3(Er3,pt1,pt1,pt4,1,p1ap1bp4c)
+
+	call rank3(Er3,pt1,pt1,qt,1,kap1bp1c)
+
+	call rank3(Er3,pt1,pt2,pt2,1,p1ap2bp2c)
+
+	call rank3(Er3,pt1,pt2,pt3,1,p1ap2bp3c)
+
+	call rank3(Er3,pt1,pt2,pt4,1,p1ap2bp4c)
+
+	call rank3(Er3,pt1,pt2,qt,1,kap1bp2c)
+
+	call rank3(Er3,pt1,pt3,pt3,1, p1ap3bp3c)
+
+	call rank3(Er3,pt1,pt3,pt4,1, p1ap3bp4c)
+
+	call rank3(Er3,pt1,pt3,qt,1, kap1bp3c)
+
+	call rank3(Er3,pt1,pt4,pt4,1, p1ap4bp4c)
+
+	call rank3(Er3,pt1,pt4,qt,1, kap1bp4c)
+
+	call rank3(Er3,pt2,pt2,pt3,1, p2ap2bp3c)
+
+	call rank3(Er3,pt2,pt2,pt4,1, p2ap2bp4c)
+
+	call rank3(Er3,pt2,pt2,qt,1, kap2bp2c)
+
+	call rank3(Er3,pt2,pt3,pt3,1, p2ap3bp3c)
+
+	call rank3(Er3,pt2,pt3,pt4,1, p2ap3bp4c)
+
+	call rank3(Er3,pt2,pt3,qt,1, kap2bp3c)
+
+	call rank3(Er3,pt2,pt4,pt4,1, p2ap4bp4c)
+
+	call rank3(Er3,pt2,pt4,qt,1,  kap2bp4c)
+
+	call rank3(Er3,pt3,pt3,pt4,1, p3ap3bp4c)
+
+	call rank3(Er3,pt3,pt3,qt,1, kap3bp3c)
+
+	call rank3(Er3,pt3,pt4,pt4,1, p3ap4bp4c)
+
+	call rank3(Er3,pt3,pt4,qt,1, kap3bp4c)
+
+
+	call rank3(Er3,pt4,pt4,qt,1, kap4bp4c)
+
+	call rank3(Er3,pt1,pt4,qt,2, gabkc)
+
+	call rank3(Er3,pt1,pt4,pt1,2, gabp1c)
+
+	call rank3(Er3,pt1,pt4,pt2,2, gabp2c)
+
+	call rank3(Er3,pt1,pt4,pt3,2, gabp3c)
+
+	call rank3(Er3,pt1,pt4,pt4,2, gabp4c)
+
+
+	elmat=0d0
+*****SOLO IL ROUTING 5 È USATO, PERÒ LASCIO COMUNQUE IL CODICE COMMENTATO SE MAI SERVISSERO DEI TEST
+
+	if(i.eq.1) then
+	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing1.F'
+            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
+
+        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    else
+		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    endif
+
+
+    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing1.F'
+	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
+
+	elseif(i.eq.2) then
+	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing2.F'
+            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
+        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    else
+		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    endif
+
+    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing2.F'
+	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
+	elseif(i.eq.3) then
+  	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing3.F'
+            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
+        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    else
+		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    endif
+
+    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing3.F'
+	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
+	elseif(i.eq.4) then
+    	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing4.F'
+            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
+        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    else
+		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    endif
+    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing4.F'
+	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
+!
+	elseif(i.eq.5) then
+	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing5.F'
+
+            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
+
+        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    else
+		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    endif
+    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing5.F'
+	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
+	endif
+
+      end
+************************
+      subroutine routing_mumu(amme,mmu,pt1,pt2,pt3,pt4,qt,
+     >				 momvec,mominv,masses,i,elmat,ifc)
+
+#ifdef COLLIER
+        use collier
+#endif
+        implicit none
+
+	double precision pt1(0:3),pt2(0:3),pt3(0:3),pt4(0:3),qt(0:3)
+	double precision pt(0:3)
+	real*8 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
+	double precision amme,mmu,s,s1,me2,me4,mm2,mm4
+
+        external vpolc
+        double complex vpolc,alphar
+
+        common/ialpharunning/iarun
+        integer iarun
+
+
+	double complex tens(1:35)
+	double complex tensuv(1:35)
+
+	character*3 ifc
+
+	double complex masses(0:4)
+	double complex mominv(1:10)
+	double complex momvec(0:3,4)
+
+	double complex E0L
+	double complex Evec(0:3)
+	double complex Er2(0:9),Er2m(0:3,0:3)
+	double complex Er3(0:19),Er3m(0:3,0:3,0:3)
+
+	double complex elmat,elmat1
+
+	integer i,k,l,m,n,o,p
+
+	double complex p1a
+	double complex p2a
+	double complex p3a
+	double complex p4a
+	double complex ka
+
+        DOUBLE COMPLEX gab
+
+        DOUBLE COMPLEX p1ap1b
+        DOUBLE COMPLEX p1ap2b
+        DOUBLE COMPLEX p1ap3b
+        DOUBLE COMPLEX p1ap4b
+        DOUBLE COMPLEX kap1b
+        DOUBLE COMPLEX p2ap2b
+        DOUBLE COMPLEX p2ap3b
+        DOUBLE COMPLEX p2ap4b
+        DOUBLE COMPLEX kap2b
+        DOUBLE COMPLEX p3ap3b
+        DOUBLE COMPLEX p3ap4b
+        DOUBLE COMPLEX kap3b
+        DOUBLE COMPLEX p4ap4b
+        DOUBLE COMPLEX kap4b
+        DOUBLE COMPLEX kakb
+
+        DOUBLE COMPLEX p1ap1bp2c
+        DOUBLE COMPLEX p1ap1bp3c
+        DOUBLE COMPLEX p1ap1bp4c
+        DOUBLE COMPLEX kap1bp1c
+        DOUBLE COMPLEX p1ap2bp2c
+        DOUBLE COMPLEX p1ap2bp3c
+        DOUBLE COMPLEX p1ap2bp4c
+        DOUBLE COMPLEX kap1bp2c
+        DOUBLE COMPLEX p1ap3bp3c
+        DOUBLE COMPLEX p1ap3bp4c
+        DOUBLE COMPLEX kap1bp3c
+        DOUBLE COMPLEX p1ap4bp4c
+        DOUBLE COMPLEX kap1bp4c
+        DOUBLE COMPLEX p2ap2bp3c
+        DOUBLE COMPLEX p2ap2bp4c
+        DOUBLE COMPLEX kap2bp2c
+        DOUBLE COMPLEX p2ap3bp3c
+        DOUBLE COMPLEX p2ap3bp4c
+        DOUBLE COMPLEX kap2bp3c
+        DOUBLE COMPLEX p2ap4bp4c
+        DOUBLE COMPLEX kap2bp4c
+        DOUBLE COMPLEX p3ap3bp4c
+        DOUBLE COMPLEX kap3bp3c
+        DOUBLE COMPLEX p3ap4bp4c
+        DOUBLE COMPLEX kap3bp4c
+        DOUBLE COMPLEX kap4bp4c
+
+        DOUBLE COMPLEX gabkc
+        DOUBLE COMPLEX gabp1c
+        DOUBLE COMPLEX gabp2c
+        DOUBLE COMPLEX gabp3c
+        DOUBLE COMPLEX gabp4c
+
+	external dot
+	double precision dot
+
+
+
+	p1p2 = dot(pt1,pt2)
+	p1p3 = dot(pt1,pt3)
+	p1p4 = dot(pt1,pt4)
+	kp1  = dot(pt1,qt)
+	p2p3 = dot(pt2,pt3)
+	p2p4 = dot(pt2,pt4)
+	kp2  = dot(pt2,qt)
+	kp3 = dot(pt3,qt)
+	p3p4 = dot(pt3,pt4)
+	kp4  = dot(pt4,qt)
+	s=dot(pt1+pt2,pt1+pt2)
+	s1=dot(pt3+pt4,pt3+pt4)
+
+
+
+#ifdef COLLIER
+
+	call Eten_cll(tens,tensuv,momvec,mominv,masses,3)
+
+#endif
+
+
+
+************QUI PRENDIAMO I VARI ELEMENTI DI TENS E ISOLIAMO QUELLO SCALARE, VETTORIALE, TENSORIALE DI RANK2 E 3
+        E0L = tens(1)
+
+        Evec(0) = tens(2)
+        Evec(1) = tens(3)
+        Evec(2) = tens(4)
+        Evec(3) = tens(5)
+
+        Er2(0) = tens(6)
+        Er2(1) = tens(7)
+        Er2(2) = tens(8)
+        Er2(3) = tens(9)
+        Er2(4) = tens(10)
+        Er2(5) = tens(11)
+        Er2(6) = tens(12)
+        Er2(7) = tens(13)
+        Er2(8) = tens(14)
+        Er2(9) = tens(15)
+
+      Er2m(0,0)=Er2(0)
+      Er2m(0,1)=Er2(1)
+      Er2m(1,0)=Er2(1)
+      Er2m(2,0)=Er2(2)
+      Er2m(0,2)=Er2(2)
+      Er2m(3,0)=Er2(3)
+      Er2m(0,3)=Er2(3)
+      Er2m(1,1)=Er2(4)
+      Er2m(1,2)=Er2(5)
+      Er2m(2,1)=Er2(5)
+      Er2m(1,3)=Er2(6)
+      Er2m(3,1)=Er2(6)
+      Er2m(2,2)=Er2(7)
+      Er2m(2,3)=Er2(8)
+      Er2m(3,2)=Er2(8)
+      Er2m(3,3)=Er2(9)
+
+      Er3(0) = tens(16)
+      Er3(1) = tens(17)
+      Er3(2) = tens(18)
+      Er3(3) = tens(19)
+      Er3(4) = tens(20)
+      Er3(5) = tens(21)
+      Er3(6) = tens(22)
+      Er3(7) = tens(23)
+      Er3(8) = tens(24)
+      Er3(9) = tens(25)
+      Er3(10) = tens(26)
+      Er3(11) = tens(27)
+      Er3(12) = tens(28)
+      Er3(13) = tens(29)
+      Er3(14) = tens(30)
+      Er3(15) = tens(31)
+      Er3(16) = tens(32)
+      Er3(17) = tens(33)
+      Er3(18) = tens(34)
+      Er3(19) = tens(35)
+
+	Er3m(0, 0, 0) = Er3(0)
+	Er3m(0, 0, 1) = Er3(1)
+	Er3m(0, 1, 0) = Er3(1)
+	Er3m(1, 0, 0) = Er3(1)
+	Er3m(0, 0, 2) = Er3(2)
+	Er3m(0, 2, 0) = Er3(2)
+	Er3m(2, 0, 0) = Er3(2)
+	Er3m(0, 0, 3) = Er3(3)
+	Er3m(0, 3, 0) = Er3(3)
+	Er3m(3, 0, 0) = Er3(3)
+	Er3m(0, 1, 1) = Er3(4)
+	Er3m(1, 0, 1) = Er3(4)
+	Er3m(1, 1, 0) = Er3(4)
+	Er3m(0, 1, 2) = Er3(5)
+	Er3m(0, 2, 1) = Er3(5)
+	Er3m(1, 0, 2) = Er3(5)
+	Er3m(1, 2, 0) = Er3(5)
+	Er3m(2, 0, 1) = Er3(5)
+	Er3m(2, 1, 0) = Er3(5)
+	Er3m(0, 1, 3) = Er3(6)
+	Er3m(0, 3, 1) = Er3(6)
+	Er3m(1, 0, 3) = Er3(6)
+	Er3m(1, 3, 0) = Er3(6)
+	Er3m(3, 0, 1) = Er3(6)
+	Er3m(3, 1, 0) = Er3(6)
+	Er3m(0, 2, 2) = Er3(7)
+	Er3m(2, 0, 2) = Er3(7)
+	Er3m(2, 2, 0) = Er3(7)
+	Er3m(0, 2, 3) = Er3(8)
+	Er3m(0, 3, 2) = Er3(8)
+	Er3m(2, 0, 3) = Er3(8)
+	Er3m(2, 3, 0) = Er3(8)
+	Er3m(3, 0, 2) = Er3(8)
+	Er3m(3, 2, 0) = Er3(8)
+	Er3m(0, 3, 3) = Er3(9)
+	Er3m(3, 0, 3) = Er3(9)
+	Er3m(3, 3, 0) = Er3(9)
+	Er3m(1, 1, 1) = Er3(10)
+	Er3m(1, 1, 2) = Er3(11)
+	Er3m(1, 2, 1) = Er3(11)
+	Er3m(2, 1, 1) = Er3(11)
+	Er3m(1, 1, 3) = Er3(12)
+	Er3m(1, 3, 1) = Er3(12)
+	Er3m(3, 1, 1) = Er3(12)
+	Er3m(1, 2, 2) = Er3(13)
+	Er3m(2, 1, 2) = Er3(13)
+	Er3m(2, 2, 1) = Er3(13)
+	Er3m(1, 2, 3) = Er3(14)
+	Er3m(1, 3, 2) = Er3(14)
+	Er3m(2, 1, 3) = Er3(14)
+	Er3m(2, 3, 1) = Er3(14)
+	Er3m(3, 1, 2) = Er3(14)
+	Er3m(3, 2, 1) = Er3(14)
+	Er3m(1, 3, 3) = Er3(15)
+	Er3m(3, 1, 3) = Er3(15)
+	Er3m(3, 3, 1) = Er3(15)
+	Er3m(2, 2, 2) = Er3(16)
+	Er3m(2, 2, 3) = Er3(17)
+	Er3m(2, 3, 2) = Er3(17)
+	Er3m(3, 2, 2) = Er3(17)
+	Er3m(2, 3, 3) = Er3(18)
+	Er3m(3, 2, 3) = Er3(18)
+	Er3m(3, 3, 2) = Er3(18)
+	Er3m(3, 3, 3) = Er3(19)
+
+***************vettoriali
+        p1a=dot(pt1,REAL(Evec))+(0.d0,1.d0)*dot(pt1,AIMAG(Evec))
+        p2a=dot(pt2,REAL(Evec))+(0.d0,1.d0)*dot(pt2,AIMAG(Evec))
+	p3a=dot(pt3,REAL(Evec))+(0.d0,1.d0)*dot(pt3,AIMAG(Evec))
+	p4a=dot(pt4,REAL(Evec))+(0.d0,1.d0)*dot(pt4,AIMAG(Evec))
+        ka=dot(qt,REAL(Evec))+(0.d0,1.d0)*dot(qt,AIMAG(Evec))
+
+*********rango 2
+
+        call rank2_c(Er2,pt3,qt,2,gab)
+
+        call rank2_c(Er2,pt1,pt1,1,p1ap1b)
+
+        call rank2_c(Er2,pt1,pt2,1,p1ap2b)
+
+        call rank2_c(Er2,pt1,pt3,1,p1ap3b)
+
+        call rank2_c(Er2,pt1,pt4,1,p1ap4b)
+
+        call rank2_c(Er2,pt1,qt,1,kap1b)
+
+        call rank2_c(Er2,pt2,pt2,1,p2ap2b)
+
+        call rank2_c(Er2,pt2,pt3,1,p2ap3b)
+
+        call rank2_c(Er2,pt2,pt4,1,p2ap4b)
+
+        call rank2_c(Er2,pt2,qt,1,kap2b)
+
+        call rank2_c(Er2,pt3,pt3,1,p3ap3b)
+
+        call rank2_c(Er2,pt3,pt4,1,p3ap4b)
+
+        call rank2_c(Er2,pt3,qt,1,kap3b)
+
+        call rank2_c(Er2,pt4,pt4,1,p4ap4b)
+
+        call rank2_c(Er2,pt4,qt,1,kap4b)
+
+        call rank2_c(Er2,qt,qt,1,kakb)
+
+**********************rango 3
+
+        call rank3_c(Er3,pt1,pt1,pt2,1,p1ap1bp2c)
+
+        call rank3_c(Er3,pt1,pt1,pt3,1,p1ap1bp3c)
+
+        call rank3_c(Er3,pt1,pt1,pt4,1,p1ap1bp4c)
+
+        call rank3_c(Er3,pt1,pt1,qt,1,kap1bp1c)
+
+        call rank3_c(Er3,pt1,pt2,pt2,1,p1ap2bp2c)
+
+        call rank3_c(Er3,pt1,pt2,pt3,1,p1ap2bp3c)
+
+        call rank3_c(Er3,pt1,pt2,pt4,1,p1ap2bp4c)
+
+        call rank3_c(Er3,pt1,pt2,qt,1,kap1bp2c)
+
+        call rank3_c(Er3,pt1,pt3,pt3,1,p1ap3bp3c)
+
+        call rank3_c(Er3,pt1,pt3,pt4,1,p1ap3bp4c)
+
+        call rank3_c(Er3,pt1,pt3,qt,1,kap1bp3c)
+
+        call rank3_c(Er3,pt1,pt4,pt4,1,p1ap4bp4c)
+
+        call rank3_c(Er3,pt1,pt4,qt,1,kap1bp4c)
+
+        call rank3_c(Er3,pt2,pt2,pt3,1,p2ap2bp3c)
+
+        call rank3_c(Er3,pt2,pt2,pt4,1,p2ap2bp4c)
+
+        call rank3_c(Er3,pt2,pt2,qt,1,kap2bp2c)
+
+        call rank3_c(Er3,pt2,pt3,pt3,1,p2ap3bp3c)
+
+        call rank3_c(Er3,pt2,pt3,pt4,1,p2ap3bp4c)
+
+        call rank3_c(Er3,pt2,pt3,qt,1,kap2bp3c)
+
+        call rank3_c(Er3,pt2,pt4,pt4,1,p2ap4bp4c)
+
+        call rank3_c(Er3,pt2,pt4,qt,1,kap2bp4c)
+
+        call rank3_c(Er3,pt3,pt3,pt4,1,p3ap3bp4c)
+
+        call rank3_c(Er3,pt3,pt3,qt,1,kap3bp3c)
+
+        call rank3_c(Er3,pt3,pt4,pt4,1,p3ap4bp4c)
+
+        call rank3_c(Er3,pt3,pt4,qt,1,kap3bp4c)
+
+        call rank3_c(Er3,pt4,pt4,qt,1,kap4bp4c)
+
+        call rank3_c(Er3,pt1,pt4,qt,2,gabkc)
+
+        call rank3_c(Er3,pt1,pt4,pt1,2,gabp1c)
+
+        call rank3_c(Er3,pt1,pt4,pt2,2,gabp2c)
+
+        call rank3_c(Er3,pt1,pt4,pt3,2,gabp3c)
+
+        call rank3_c(Er3,pt1,pt4,pt4,2,gabp4c)
+
+
+	elmat=0d0
+*****SOLO IL ROUTING 5 È USATO, PERÒ LASCIO COMUNQUE IL CODICE COMMENTATO SE MAI SERVISSERO DEI TEST
+
+	if(i.eq.1) then
+	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing1.F'
+            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
+
+        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    else
+		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    endif
+
+
+    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing1.F'
+	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
+
+	elseif(i.eq.2) then
+	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing2.F'
+            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
+        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    else
+		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    endif
+
+    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing2.F'
+	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
+	elseif(i.eq.3) then
+  	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing3.F'
+            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
+        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    else
+		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    endif
+
+    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing3.F'
+	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
+	elseif(i.eq.4) then
+    	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing4.F'
+            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
+        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    else
+		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    endif
+    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing4.F'
+	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
+!
+	elseif(i.eq.5) then
+	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing5.F'
+
+            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
+
+        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    else
+		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
+	    endif
+    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing5.F'
+	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
+	endif
+      end
+************************
+
+
+*************
+      subroutine routing_pipi(pt1,pt2,pt3,pt4,qt,
+     >		     momvec,mominv,masses,i,j,elmati,elmatf)
+
+#ifdef COLLIER
+        use collier
+#endif
+        implicit none
+
+	double precision pt1(0:3),pt2(0:3),pt3(0:3),pt4(0:3),qt(0:3)
+	double precision pt(0:3)
+	real*8 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
+	double precision ame,ammu,convfac,alpha,pi,ame2,ampi2,ampi
+	common/parameters/ame,ammu,convfac,alpha,pi
+        common/hparam/ampi
+
+	double complex tens(1:15)
+	double complex tensuv(1:15)
+
+	character*3 ifc
+
+	double complex masses(0:4)
+	double complex mominv(1:10)
+	double complex momvec(0:3,4)
+
+	double complex E0L
+	double complex Evec(0:3)
+	double complex Er2(0:9),Er2m(0:3,0:3)
+
+	double complex elmati,elmatf,elmat1
+
+	integer i,j,k,l,m,n,o,p
+
+	double complex p1a
+	double complex p2a
+	double complex p3a
+	double complex p4a
+	double complex ka
+
+	double complex gab
+
+	double complex p1ap1b
+	double complex p1ap2b
+	double complex p1ap3b
+	double complex p1ap4b
+	double complex kap1b
+	double complex p2ap2b
+	double complex p2ap3b
+	double complex p2ap4b
+	double complex kap2b
+	double complex p3ap3b
+	double complex p3ap4b
+	double complex kap3b
+	double complex p4ap4b
+	double complex kap4b
+	double complex kakb
+
+
+	external dot
+	double precision dot
+
+        double complex vpolc,alphar
+
+        common/ialpharunning/iarun
+        integer iarun
+
+**********FF
+
+	integer iffpi
+	character*10 what_ffpi
+	common/ffpioption/iffpi,what_ffpi
+	double complex ffpiis,Cffpiis
+	double precision ffpiis2
+	double complex ffpifs,Cffpifs
+	double precision ffpifs2
+
+**************
+
+*************GVMD COMMON
+        common/gvmdrad/indexnores
+        integer indexnores
+
+       	p1p2 = dot(pt1,pt2)
+	p1p3 = dot(pt1,pt3)
+	p1p4 = dot(pt1,pt4)
+	kp1  = dot(pt1,qt)
+	p2p3 = dot(pt2,pt3)
+	p2p4 = dot(pt2,pt4)
+	kp2  = dot(pt2,qt)
+	kp3 = dot(pt3,qt)
+	p3p4 = dot(pt3,pt4)
+	kp4  = dot(pt4,qt)
+
+**************
+	ffpifs=(1.d0,0.d0)
+	ffpifs2=1.d0
+
+	ffpiis=(1.d0,0.d0)
+	ffpiis2=1.d0
+	if(iffpi.gt.0) then
+		call ffpi(2.d0*(ame**2+p1p2),ffpifs,ffpifs2)
+		call ffpi(2.d0*(ampi**2+p3p4),ffpiis,ffpiis2)
+
+	endif	
+
+        Cffpiis=CONJG(ffpiis)
+        Cffpifs=CONJG(ffpifs)
+
+        if(indexnores.eq.1) then
+           ffpiis=(1.d0,0.d0)
+           ffpifs=(1.d0,0.d0)
+	endif
+
+******ALPHA RUNNING
+	ffpiis=ffpiis*vpolc(2.d0*(ampi**2+p3p4))
+        Cffpiis=Cffpiis*CONJG(vpolc(2.d0*(ampi**2+p3p4)))
+
+	ffpifs=ffpifs*vpolc(2.d0*(ame**2+p1p2))
+        Cffpifs=Cffpifs*CONJG(vpolc(2.d0*(ame**2+p1p2)))
+        
+        ffpiis2=ffpiis*Cffpiis
+        ffpifs2=ffpifs*Cffpifs
+****************
+
+#ifdef COLLIER
+
+	call Eten_cll(tens,tensuv,momvec,mominv,masses,2)
+!        call SetMode_cll(2)
+#endif
+
+
+
+************QUI PRENDIAMO I VARI ELEMENTI DI TENS E ISOLIAMO QUELLO SCALARE, VETTORIALE, TENSORIALE DI RANK2 E 3
+
+	E0L=tens(1)
+
+	Evec(0)=tens(2)
+	Evec(1)=tens(3)
+	Evec(2)=tens(4)
+	Evec(3)=tens(5)
+
+	Er2(0)=tens(6)
+	Er2(1)=tens(7)
+	Er2(2)=tens(8)
+	Er2(3)=tens(9)
+	Er2(4)=tens(10)
+	Er2(5)=tens(11)
+	Er2(6)=tens(12)
+	Er2(7)=tens(13)
+	Er2(8)=tens(14)
+	Er2(9)=tens(15)
+
+	Er2m(0,0)=Er2(0)
+	Er2m(0,1)=Er2(1)
+	Er2m(1,0)=Er2(1)
+	Er2m(2,0)=Er2(2)
+	Er2m(0,2)=Er2(2)
+	Er2m(3,0)=Er2(3)
+	Er2m(0,3)=Er2(3)
+	Er2m(1,1)=Er2(4)
+	Er2m(1,2)=Er2(5)
+	Er2m(2,1)=Er2(5)
+	Er2m(1,3)=Er2(6)
+	Er2m(3,1)=Er2(6)
+	Er2m(2,2)=Er2(7)
+	Er2m(2,3)=Er2(8)
+	Er2m(3,2)=Er2(8)
+	Er2m(3,3)=Er2(9)
+
+***************vettoriali
+
+	p1a=dot(pt1,REAL(Evec))+(0.d0,1.d0)*dot(pt1,AIMAG(Evec))
+	p2a=dot(pt2,REAL(Evec))+(0.d0,1.d0)*dot(pt2,AIMAG(Evec))
+	p3a=dot(pt3,REAL(Evec))+(0.d0,1.d0)*dot(pt3,AIMAG(Evec))
+	p4a=dot(pt4,REAL(Evec))+(0.d0,1.d0)*dot(pt4,AIMAG(Evec))
+	ka=dot(qt,REAL(Evec))+(0.d0,1.d0)*dot(qt,AIMAG(Evec))
+
+
+*********rango 2
+
+	call rank2_c(Er2,pt3,qt,2,gab)
+
+	call rank2_c(Er2,pt1,pt1,1,p1ap1b)
+
+	call rank2_c(Er2,pt1,pt2,1,p1ap2b)
+
+	call rank2_c(Er2,pt1,pt3,1,p1ap3b)
+
+	call rank2_c(Er2,pt1,pt4,1,p1ap4b)
+
+	call rank2_c(Er2,pt1,qt,1,kap1b)
+
+	call rank2_c(Er2,pt2,pt2,1,p2ap2b)
+
+	call rank2_c(Er2,pt2,pt3,1,p2ap3b)
+
+	call rank2_c(Er2,pt2,pt4,1,p2ap4b)
+
+	call rank2_c(Er2,pt2,qt,1,kap2b)
+
+	call rank2_c(Er2,pt3,pt3,1,p3ap3b)
+
+	call rank2_c(Er2,pt3,pt4,1,p3ap4b)
+
+	call rank2_c(Er2,pt3,qt,1,kap3b)
+
+	call rank2_c(Er2,pt4,pt4,1,p4ap4b)
+
+	call rank2_c(Er2,pt4,qt,1,kap4b)
+
+	call rank2_c(Er2,qt,qt,1,kakb)
+
+
+
+
+	elmati=(0.d0,0.d0)
+	elmatf=(0.d0,0.d0)
+	if(i.eq.1) then
+	  if(j.eq.1) then
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/ISR/Pent_Routing1_isr1.F'
+	elmati=elmat1*Cffpiis*ffpifs
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/FSR/Pent_Routing1_fsr1.F'
+	elmatf=elmat1*ffpifs*Cffpifs
+	  elseif(j.eq.3) then
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing1_isr3.F'
+	elmati=elmat1*ffpiis*Cffpiis
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing1_fsr3.F'
+	elmatf=elmat1*(ffpiis*Cffpifs)
+
+	  endif
+	elseif(i.eq.2) then
+	  if(j.eq.1) then
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/ISR/Pent_Routing2_isr1.F'
+	elmati=elmat1*Cffpiis*ffpifs
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/FSR/Pent_Routing2_fsr1.F'
+	elmatf=elmat1*ffpifs*Cffpifs
+	  elseif(j.eq.3) then
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing2_isr3.F'
+	elmati=elmat1*ffpiis*Cffpiis
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing2_fsr3.F'
+	elmatf=elmat1*(ffpiis*Cffpifs)
+	  endif
+	elseif(i.eq.3) then
+	  if(j.eq.1) then
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/ISR/Pent_Routing3_isr1.F'
+	elmati=elmat1*Cffpiis*ffpifs
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/FSR/Pent_Routing3_fsr1.F'
+	elmatf=elmat1*ffpifs*Cffpifs
+	  elseif(j.eq.3) then
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing3_isr3.F'
+	elmati=elmat1*ffpiis*Cffpiis
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing3_fsr3.F'
+	elmatf=elmat1*(ffpiis*Cffpifs)
+	  endif
+	elseif(i.eq.4) then
+	  if(j.eq.1) then
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/ISR/Pent_Routing4_isr1.F'
+	elmati=elmat1*Cffpiis*ffpifs
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/FSR/Pent_Routing4_fsr1.F'
+	elmatf=elmat1*ffpifs*Cffpifs
+	  elseif(j.eq.3) then
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing4_isr3.F'
+	elmati=elmat1*ffpiis*Cffpiis
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing4_fsr3.F'
+	elmatf=elmat1*(ffpiis*Cffpifs)
+	  endif
+	elseif(i.eq.5) then
+	  if(j.eq.1) then
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/ISR/Pent_Routing5_isr1.F'
+	elmati=elmat1*Cffpiis*ffpifs
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/FSR/Pent_Routing5_fsr1.F'
+	elmatf=elmat1*ffpifs*Cffpifs
+	  elseif(j.eq.3) then
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing5_isr3.F'
+	elmati=elmat1*ffpiis*Cffpiis
+  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing5_fsr3.F'
+	elmatf=elmat1*(ffpiis*Cffpifs)
+	  endif
+       endif
+      end

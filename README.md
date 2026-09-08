@@ -8,16 +8,34 @@ O. Nicrosini, F. Piccinini and F.P. Ucci. [(*)](#footnote)
 
 ## Compiling and running the code
 
-Just tune the file `Makefile` for your needs and run `make`.
-Default compilation is performed with `main.F` and produces the executable `babayaga`.
+Customize the `Makefile` according to your system environment, then run:
 
-A template main (driver `driver_gen_events.F`) is provided,
-containing a minimal version of a main program calling the wrapper routine to generate events.
-To compile the wrapped version of the main just run
-
+```bash
+make
 ```
+
+By default, compilation is performed using `main.F` to produce the `babayaga` executable.
+
+### Verifying the Installation
+
+To verify that the installation was successful, run:
+
+```bash
+./test_channels.sh
+```
+
+The test may take a few minutes to complete. If the setup is correct, the terminal will display:
+`CHECK OK, CORRECT INSTALLATION`
+
+### Compiling the Wrapped Version
+
+A template main driver (`driver_gen_events.F`) is provided as a minimal example of calling the event generator wrapper routine.
+
+To compile the wrapped version, run:
+
+```bash
 make libbabayagafull.a
-gfortran -O3 -fPIC driver_gen_events.F libbabayagafull.a -o babayaga-wrap`
+gfortran -O3 -fPIC driver_gen_events.F libbabayagafull.a -o babayaga-wrap
 ```
 
 ## External programs
@@ -77,7 +95,6 @@ from the following options:
 -  `besiii`
 -  `kloe2`
 -  `phokhara`
--  `bern`
 
 When you run BabaYaga, enter at the prompt the variable and value you want to
 change and then type `run`. You can also type `help` to print a brief
@@ -110,15 +127,27 @@ run.
 - `nev` &rarr; number of events to be generated
 - `path` &rarr; directory where to store output files. In *nix systems, the directory is automatically created.
 - `saveevents` &rarr; if saving an ascii file where weighted or unweighted (according to `mode`) events are save. The file is `path/events.dat`.
-- `iffpi` &rarr; the way $F_\pi(q^2)$ is introduced in the calculation:
-	- For radiative $\pi^+\pi^-\gamma$
- 		- `0` &rarr; Pion form factor off
-		- `1` &rarr; Pion form factor $\text{F}\times\text{sQED}$
-	- For $\pi^+\pi^-$ production
-		- `0` &rarr; Pion form factor off
-		- `1` &rarr; Pion form factor $\text{F}\times\text{sQED}$
-		- `2` &rarr; Pion form factor GVMD
-		- `3` &rarr; Pion form factor FsQED
+- `iffpi` — How the pion form factor $F_\pi(q^2)$ is introduced in the calculation:
+
+  - **For radiative $\pi^+\pi^-\gamma$ (pr):**
+    - `0` → Pion form factor off
+    - `1` → Pion form factor $\text{F}\times\text{sQED}$
+    - `2` → Pion form factor GVMD
+    - `3` → Pion form factor FsQED
+
+
+  - **For $\pi^+\pi^-$ production (pp):**
+    - `0` → Pion form factor off
+    - `1` → Pion form factor $\text{F}\times\text{sQED}$
+    - `2` → Pion form factor GVMD
+    - `3` → Pion form factor FsQED
+
+  > **REMARK:** For treatments beyond $F \times \text{sQED}$, setting `iffpi = 3` is recommended. It is computationally more efficient and applicable to any pion form factor parametrization, provided it satisfies sum rules and dispersion relations to a given accuracy. 
+
+- `iFSRdisp` — Toggles structure-dependent Final-State corrections (i.e. virtual corrections where the virtual photon connects exclusively to final-state pion legs):
+    - `0` → Final-State corrections evaluated in $F \times \text{sQED}$
+    - `1` → Final-State corrections evaluated in GVMD or FsQED (depending on whether `iffpi = 2` or `3`)
+	
 - `what_ffpi` &rarr; to set which parametrization of the pion form factor must be used.
 - `arun`	  &rarr; sets $\alpha(s)$ routine:
  	- `off`   &rarr; sets alpha running off
@@ -141,6 +170,18 @@ run.
 - `nsearch` &rarr;	nsearch events are generated to find the maximum value of the cross section, after which also events unweightening is started.
 - `verbose` &rarr; it toggles some verbose output, only for debugging
 - `sdmax` &rarr; the starting maximum value for the cross section
+* `phidec` — A 3-digit integer to select additional Final State Radiation (FSR) corrections for $\pi^+\pi^-\gamma$ production:
+
+  > **REMARK:** These corrections are suited for describing processes at center-of-mass energies up to $\sqrt{s} \simeq 1\text{ GeV}$.
+
+  * **First digit (0/1):** Controls whether $\chi\text{PT}$ bremsstrahlung corrections are active (`1`) or off (`0`).
+  * **Second digit (0/1/2/3):** Controls direct $\phi$ decays through scalar mesons ($\sigma, f_0$):
+    * `0` → Off
+    * `1` → KK model, as in [arXiv:0706.3027](https://arxiv.org/abs/0706.3027)
+    * `2` → "No structure" model, as in [arXiv:0706.3027](https://arxiv.org/abs/0706.3027)
+    * `3` → KLOE model, as in [arXiv:hep-ph/0512047](https://arxiv.org/abs/hep-ph/0512047)
+  * **Third digit (0/1):** Controls double-resonant $\phi$ decays (off = `0`, on = `1`). When active, it is implemented as in [arXiv:0706.3027](https://arxiv.org/abs/0706.3027).
+
 
 ## User modifiable routines
  
@@ -159,6 +200,15 @@ The subroutines the user may need to modify are:
 
 The output files are saved in the `path` directory. The files are
 - `events.dat`: it is the file where unweighted/weighted events are stored, if `saveevents` is set to `yes`.
+
+  Each event is written sequentially as:
+  ```text
+  #EVENT <N>
+  <WEIGHT>
+  <KINEMATICS>
+  ```
+  *N.B.* Even in unweighted mode, an event's weight can be different from 1. This occurs when a bias is present, such as an underestimation of the maximum upper-bound value during the pre-run. To ensure statistical consistency, the weight in those cases is set to weight/weight_max.
+  
 - `statistics.txt`: it is the file (dumped every `nwrite` points) where cross sections, statistics information,
   input parameters, etc. are printed. After the input parameters entered by the user, the weighted
 	integrated cross section is printed. It is subdivided by photon multiplicity: the single cross sections

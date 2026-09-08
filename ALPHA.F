@@ -6,6 +6,7 @@
       logical optspn
       double precision p(4,4),pph(4,nphmx),mss(4)
       common/parameters/ame,ammu,convfac,alpha,pi
+      common/hparam/ampi
       double precision xi(1)
       integer ifirst
       common/gluealphacommon/ifirst
@@ -33,12 +34,24 @@
       elseif (fs(1:1).eq.'e') then
          mss(2) = ame
          mss(4) = ame
+      elseif (fs(1:1).eq.'p') then
+         mss(1) = ame
+         mss(2) = ame
+         mss(3) = ampi
+         mss(4) = ampi   
       endif
 
       p(1:4,1) = -p1(0:3)
       p(1:4,2) =  p4(0:3)
       p(1:4,3) = -p2(0:3)
       p(1:4,4) =  p3(0:3)
+
+      if (fs(1:1).eq.'p') then
+         p(1:4,1) = -p1(0:3)
+         p(1:4,2) = -p2(0:3)
+         p(1:4,3) =  p4(0:3)
+         p(1:4,4) =  p3(0:3)
+      endif
 
       do k = 1,ng
          pph(1:4,k) = qph(k,0:3)
@@ -107,12 +120,12 @@ c      do jspn = 0,2**(4-1+ng)-1
 !     sum over spin configurations, but reduced
 
 ! random spin configuration
-c      extraw = 2**(4+ng)
-c      call rndmgnrtr(r)
-c      jspn = extraw*r
-c      optspn = .false.
-c      call eemumu(p,jspn,optspn,mss,ng,pph,emtxalpha)
-c      emtx2 = emtx2 + emtxalpha
+c$$$      extraw = 2**(4+ng)
+c$$$      call rndmgnrtr(r)
+c$$$      jspn = extraw*r
+c$$$      optspn = .false.
+c$$$      call eemumu(p,jspn,optspn,mss,ng,pph,emtxalpha)
+c$$$      emtx2 = emtx2 + emtxalpha
 
       elseif(fs(1:1).eq.'e') then
          do jspn = 0,2**(4+ng)-1
@@ -124,6 +137,7 @@ c      do jspn = 0,2**(4-1+ng)-1
       elseif(fs(1:1).eq.'p') then
          do jspn = 0,2**(2+ng)-1
             call eepipi(p,jspn,optspn,mss,ng,pph,emtxalpha)
+!            print*,emtxalpha
             emtx2 = emtx2 + emtxalpha
          enddo
 
@@ -190,16 +204,24 @@ C***********************************************************************
 !
       complex*16 photonpropagatorpipi
       real*8 q(4)
+      real*8 rrlrnzprdct
+            
       double complex vpolc
       external vpolc
 !
-      real*8 rrlrnzprdct
+      integer iffpi,iffpibck,vals,u,error
+
+      character*10 what_ffpi
+      common/ffpioption/iffpi,what_ffpi
+      complex*16 ffpic
+      real*8 ffpi2
 !
       real*8 qq
 !
       qq=rrlrnzprdct(q,q)
+      call ffpi(qq,ffpic,ffpi2)
 c      if(qq.lt.3.8d0) then
-      photonpropagatorpipi = (1.d0,0.d0)/qq
+      photonpropagatorpipi = (1.d0,0.d0)/qq*ffpic
 c      else
 c         photonpropagator = (1.d0,0.d0)/qq
 c      endif
@@ -299,7 +321,10 @@ C***********************************************************************
       save frst,tblmrg
       real*8 q(4),s1,s2,pspne,pspnm,prb,r
       complex*16 :: tmpvec(4)
+      double precision time,time1
 !
+!      call cpu_time(time1)
+!      print*,'ciao'
       jj = jspn
       spn(1)=0.49d0
       if (mod(jj,2).eq.0) spn(1)=-0.49d0
@@ -404,10 +429,12 @@ c$$$            endif
 c$$$         enddo
 c$$$      enddo
 *** END CHATGPT
+            
       if(frst) then
          frst=.false.
          call mrgng(tblmrg)
       endif
+      
       curree=(0.d0,0.d0)
       currmumu=(0.d0,0.d0)
       do j1=0,2**nph-1
@@ -435,6 +462,8 @@ c$$$      enddo
      .                 dot_product(dconjg(psi(1:4,j2,4)),
      .                 matmul(psi(1:4,j1,2),gam(1:4,1:4,j3)) )
      .                 +currmumu(j3,jj)  !  gamma matrix are transposed
+!     per spegnere radiazione dal mu
+!                  if(jj.ne.0) currmumu(1:4,jj)=0.d0
                enddo
             endif
          enddo
@@ -458,30 +487,9 @@ c     .        **photonpropagator(q),'  amp',amp
       enddo
 c      mesq=abs(amp)**2*prb
       mesq=amp*dconjg(amp)*prb
-c      print*,amp
-!     test
-!!!$$$      do j1=0,2**nph-1
-!!!$$$         q=p(1:4,1)+p(1:4,3)
-!!!$$$         do j2=1,nph
-!!!$$$            if(tblmrg(j2,j1).eq.1) q=q+pph(1:4,j2)
-!!!$$$         enddo
-!!!$$$         write(*,*)'qmu jmu', q(1)*curree(1,j1)-q(2)*curree(2,j1)
-!!!$$$     .        -q(3)*curree(3,j1)-q(4)*curree(4,j1)
-!!!$$$         write(*,*)'j1,jmu',j1,curree(1:4,j1)
-!!!$$$         write(*,*)'******'
-!!!$$$      enddo
-!
-!!!$$$      do j1=0,2**nph-1
-!!!$$$         q=p(1:4,2)+p(1:4,4)
-!!!$$$         do j2=1,nph
-!!!$$$            if(tblmrg(j2,j1).eq.1) q=q+pph(1:4,j2)
-!!!$$$         enddo
-!!!$$$         write(*,*)'qmu jmu', q(1)*currmumu(1,j1)-q(2)*currmumu(2,j1)
-!!!$$$     .        -q(3)*currmumu(3,j1)-q(4)*currmumu(4,j1)
-!!!$$$         write(*,*)'j1,jmu',j1,currmumu(1:4,j1)
-!!!$$$         write(*,*)'******'
-!!!$$$      enddo
-!
+!      call cpu_time(time)
+!      print*,time-time1
+      
       return
       end
 C***********************************************************************
@@ -1639,8 +1647,9 @@ c      complex*16 psi(4,0:2**nphmx-1,nfer),pi(0:2**nphmx-1,npi)
       real*8 q(4),s1,s2,pspne,pspnm,prb,r
 !
 
-      call allocate(psi(4, 0:2**nphmx-1, nfer))
-      call allocate(pi(0:2**nphmx-1, npi))
+      
+      allocate(psi(4, 0:2**nphmx-1, nfer))
+      allocate(pi(0:2**nphmx-1, npi))
 
       jj=jspn
       spn(1)=0.49d0
@@ -1659,6 +1668,7 @@ c      complex*16 psi(4,0:2**nphmx-1,nfer),pi(0:2**nphmx-1,npi)
 !     test
 !      epsph(nph)=-1.d30
 !     end test
+
       if(s1.gt.0.d0) then
          pspne=1.d0
       else
@@ -1691,6 +1701,7 @@ c      complex*16 psi(4,0:2**nphmx-1,nfer),pi(0:2**nphmx-1,npi)
       do j1=1,nph
          call photpol(pph(1:4,j1),epsph(j1),eps(1:4,j1))
       enddo
+      
       do j1=0,2**nph-1
          do j2=j1,2**nph-1
             if(j2.eq.j1.and.j1.ne.0) cycle
@@ -1795,8 +1806,8 @@ c      complex*16 psi(4,0:2**nphmx-1,nfer),pi(0:2**nphmx-1,npi)
       enddo
 !
 
-      call deallocate(psi)
-      call deallocate(pi)
+      deallocate(psi)
+      deallocate(pi)
 
       return
       end

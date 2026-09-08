@@ -87,6 +87,8 @@ FPCHECK =
 
 EXTRADEPS = #Makefile
 
+MMLP_DEPS=$(wildcard pipirad/*/*.[fF])
+
 VPHLMNT=vp_hlmnt_v2_1
 VPHLMNT=vp_hlmnt_v2_1_1
 VPHLMNT=vp_hlmnt_v2_2
@@ -117,7 +119,7 @@ pack: # use only to release BABAYAGA
 	cp -ra $(CLLDIR)-clean/ $(RELEASEDIR)/$(CLLDIR)-clean/ &&\
 	cp -ra $(RCLDIR)-clean/ $(RELEASEDIR)/$(RCLDIR)-clean/ &&\
 	cp -ra pipirad/ mumurad/ eerad/ pions/ $(RELEASEDIR)/ &&\
-        cp -r input_rad Makefile README shared.F\
+        cp -r input_rad Makefile README.md test_channels.sh reference.txt shared.F\
         main.F loops.F gen_events.F commonmain.F cuts.F sv.F matrix_model.F mapmomenta.F vpol_novosibirsk.dat\
         routines.F invariants.h sampling.F phasespace.F distributions.F $(VPHLMNT).F\
         hadr5n16.F hadr5n09.F userinterface.F intpl.F Rteubner.F strong2020common.F driver_gen_events.F\
@@ -156,7 +158,7 @@ initcloseby.o: initcloseby.F commonmain.F $(EXTRADEPS) collier
 	$(F77) -c $(COLLIER) $(CLLMOD) initcloseby.F
 cuts.o: cuts.F $(EXTRADEPS) strong2020common.F
 	$(F77) $(DEXP) -c cuts.F
-matrix_model.o: matrix_model.F  form/formme.F form/ee3gexact.F form/borngg.F form/formmemm.F pipirad/hard/*.F $(EXTRADEPS)
+matrix_model.o: matrix_model.F form/formme.F form/ee3gexact.F form/borngg.F form/formmemm.F pipirad/hard/*.F $(EXTRADEPS) $(MMLP_DEPS)
 	$(F77) -c matrix_model.F
 sv.o: sv.F $(EXTRADEPS) Makefile  collier
 	$(F77) -c $(COLLIER) $(CLLMOD) $(QUADTYPE) sv.F
@@ -194,7 +196,7 @@ mapmomenta.o: mapmomenta.F $(EXTRADEPS)
 	$(F77) -c mapmomenta.F
 sampling.o: sampling.F $(EXTRADEPS) strong2020common.F
 	$(F77) -c $(DEXP) sampling.F
-loops.o: loops.F $(EXTRADEPS) collier
+loops.o: loops.F $(EXTRADEPS) collier $(MMLP_DEPS)
 	$(F77) -c $(COLLIER) $(CLLMOD) $(QUADTYPE) loops.F
 routines.o: routines.F $(EXTRADEPS) collier
 	$(F77) $(COLLIER) $(CLLMOD) -c routines.F
@@ -206,7 +208,7 @@ recola_int.o: recola_int.F $(EXTRADEPS) Makefile $(RCLDIR)/lib/librecola.a
 	$(F77) $(RECOLA) $(RCLMOD) -c recola_int.F	
 hard_ampl.o: hard_ampl.F $(EXTRADEPS)
 	$(F77) -c hard_ampl.F
-pent.o: pent.F $(EXTRADEPS) $(LTDIR)/lib64/libooptools$(QUAD).a
+pent.o: pent.F $(EXTRADEPS) $(LTDIR)/lib64/libooptools$(QUAD).a $(MMLP_DEPS)
 	$(F77) -c $(LT) $(LTINC) $(QUADTYPE) pent.F
 approximations.o: approximations.F $(EXTRADEPS)
 	$(F77) -c approximations.F

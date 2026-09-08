@@ -38,6 +38,34 @@ c      return
 
       return
       end
+*****************************************
+      SUBROUTINE GAUSS01(X1, X2)
+*=====================================================*
+*  Generates two independent Gaussian random numbers *
+*  with mean=0 and variance=1                        *
+*  Method: Box-Muller transform                      *
+*=====================================================*
+      IMPLICIT NONE
+      REAL*8 X1, X2
+      REAL*8 U1, U2,u11(1),u21(1), R, THETA
+      REAL*8 PI
+      PARAMETER (PI = 3.14159265358979)
+
+C     Generate two uniform random numbers in (0,1)
+      call getrnd(u11,1)
+      CALL getrnd(u21,1)
+
+      u1 = u11(1)
+      u2 = u21(1)
+C     Box-Muller transform
+      R     = SQRT( -2.0 * LOG(U1) )
+      THETA = 2.0 * PI * U2
+
+      X1 = R * COS(THETA)
+      X2 = R * SIN(THETA)
+
+      RETURN
+      END
 ************************************************
       subroutine getdayshuursminutesseconds(sin,d,h,m,s)
       implicit none
@@ -55,126 +83,107 @@ c      return
       return
       end
 *****************************
-      function check_invariants(p1,p2,p3,p4,q)
-      implicit double precision (x)
-      real*8 qph(40,0:3),p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
-      external dot
-      real*8 dot
-      common/checkinvariants/lim,switchcollier
-      integer switchcollier
-      double precision lim
 
-      common/lt/ltint,quadevents,ilt
-      integer ltint,quadevents,ilt
-
-
-      x12  =dot(p1,p2)
-      x13  =dot(p1,p3)
-      x14  =dot(p1,p4)
-      x15  =dot(p1,q)
-      x23  =dot(p2,p3)
-      x24  =dot(p2,p4)
-      x25 = dot(p2,q)
-      x34 = dot(p3,p4)
-      x35 = dot(p3,q)
-      x45 = dot(p4,q)
-
-      if((abs(x12).le.lim.or.
-     > abs(x13).le.lim.or.
-     > abs(x14).le.lim.or.
-     > abs(x15).le.lim.or.
-     > abs(x23).le.lim.or.
-     > abs(x24).le.lim.or.
-     > abs(x25).le.lim.or.
-     > abs(x34).le.lim.or.
-     > abs(x35).le.lim.or.
-     > abs(x45).le.lim)) then
-         ltint=1
-         quadevents=quadevents+1
-!         ltint=0
-      endif
-
-
-      end
-*******************************************************************************
-      subroutine getsignalphot(p1,p2,p3,p4,qph,ng,ind,qind)
+      subroutine D0IRyon(k1,k2,k3,m1q,m2q,m3q,m4q,cond,p1,p3)
+c     checks wether D0 is IR and if there is a mass s'>4*mp**2
+c     cond==true (IR and s' exists), ==false (not IR or s' doesn't exist)
+c     In the convention
+c
+c     D0= \int d^4 q 1/(q2-lambda2)*1/((q+p1)^2-me^2)*1/((q+p3)^2-mp^2)*1/(..
+c
+c     If the D0 Is IR the routine returns also p1 and p3 (on shell)
       implicit none
-      real*8 qph(40,0:3),p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
-      real*8 enhard,spd,spdi,c1,c2,c3,c4,enphot
-      integer k,i,ind,qind,ng
+      double precision k1(0:3),k2(0:3),k3(0:3)
+      double precision p1(0:3),p2(0:3),p3(0:3),p4(0:3)
+      double precision pf(0:3)
+      double precision p1LT(0:3),p2LT(0:3),p3LT(0:3),p4LT(0:3)
+      complex*16 m1q,m2q,m3q,m4q
+      external dotq
+      real*16 dotq
+      double precision masses(4),massesbck(4)
+      double precision momenta(4,0:3)
       external dot
       real*8 dot
-      external tridot
-      real*8 tridot
-      real*8 sang1,sang2,sang3,sang4
-      common/cutphot/phind
-      integer phind
+      external closetomassc
+      complex*32 closetomassc
+      integer i,ifound,count,isp,countm
+      logical cond,cond1
+      double precision ame,ammu,convfac,alpha,pi,ame2,ampi2,ampi
+      common/parameters/ame,ammu,convfac,alpha,pi
+      common/hparam/ampi
+      double precision reldiff,reldiff1
 
-       qind =1
+      p1=0.d0
+      p3=0.d0
 
-*******THE ME PHOTON IS CHOSEN AS THE HARDEST
+      masses(1)  = real(m1q)
+      masses(2)  = real(m2q)
+      masses(3)  = real(m3q)
+      masses(4)  = real(m4q)
 
-        if(ind.eq.1) then
-         enhard =0d0
+      momenta(1,:)=[0.d0,0.d0,0.d0,0.d0]
+      momenta(2,:)=k1
+      momenta(3,:)=k2
+      momenta(4,:)=k3
 
-         do i = 1,ng
-            if(qph(i,0).gt.0.d0) then
-               enphot = qph(i,0)
-               if (enphot.ge.enhard) then
-                  enhard = enphot
-                  qind = i
-               else
+      countm=0
+      cond1=.false.
+      cond=.false.
+!     Mi interessano solo le D0 dispersive, ossia quelle in cui c'è
+!     una massa dispersiva > 4*M_pi^2
+      do i=1,4
+         if(masses(i).le.4.d0*ampi**2) then
+            countm=countm+1
+      endif
+      enddo
 
+      if(countm.eq.4) return
+!     se non c'è nemmeno un propagatore massless non può essere IR
+
+      do i=1,4
+         if(masses(i).eq.0.d0) then
+            ifound=i
+            cond1=.true.
+         endif
+      enddo
+
+      if(.not.cond1) return
+
+      do i=1,4
+         if(i.ne.ifound) then
+            reldiff=abs((masses(i)-ame**2)/ame**2)
+            reldiff1=abs((masses(i)-ampi**2)/ampi**2)
+            if(min(reldiff,reldiff1).ge.1d-5) isp=i
+         endif
+      enddo
+
+c     il primo propagatore a questo punto quando q->0 diverge, quindi count da 1 
+      count=1
+      if(cond1) then
+         do i=1,4
+            if((i.ne.ifound).and.(i.ne.isp)) then
+               momenta(i,:)=momenta(i,:)-momenta(ifound,:)
+               pf=momenta(i,:)
+               if(abs((dot(pf,pf)-masses(i))/masses(i)).le.4d-5) then
+                  count=count+1
+                  if(abs((dot(pf,pf)-ame**2)/ame**2).le.4d-5) then
+                     p1 = pf
+                  elseif(abs((dot(pf,pf)-ampi**2)/ampi**2).le.4d-5) then
+                     p3 = pf
+                  endif
                endif
             endif
          enddo
+         if(count.ge.3) then
+            cond=.true.
+         endif
+      else
          return
 	endif
-******THE ME PHOTON IS CHOSEN AS THE SIGNAL (IF MORE THAN ONE PASSES THE CUT, WE CHOOSE THE HARDEST(DONE IN CUTS))
-
-	if(ind.eq.2) qind=phind
-
-******THE ME PHOTON IS CHOSE AS THE FURTHEST FROM THE CHARGED LEGS
-	if(ind.eq.3) then
-	spd=0d0
-
-        do k = 1,ng
-
-		q = qph(k,:)
-
-		c1 = dot(p1,q)
-		c2 = dot(p2,q)
-		c3 = dot(p3,q)
-		c4 = dot(p4,q)
-
-		if (c1.lt.c2.and.c1.lt.c3.and.c1.lt.c4) spdi =c1
-		if (c2.lt.c1.and.c2.lt.c3.and.c2.lt.c4) spdi =c2
-		if (c3.lt.c2.and.c3.lt.c1.and.c3.lt.c4) spdi =c3
-		if (c4.lt.c1.and.c4.lt.c2.and.c4.lt.c3) spdi =c4
-		if(spdi.ge.spd) then
-		   spd=spdi
-		   qind=k
-		endif
-         enddo
-	 return
-	 endif
 	return
 	end
-***********
-      subroutine cross_product(p, q, r)
-      implicit none
-      real(8) p(0:3), q(0:3) ! due quadrivettori in input
-      real(8) r(0:3) ! risultato: prodotto vettoriale delle parti spaziali
+****************************
 
-! calcolo del prodotto vettoriale solo sulle componenti 1:3
-      r(0) = 0
-      r(1) = p(2)*q(3) - p(3)*q(2)
-      r(2) = p(3)*q(1) - p(1)*q(3)
-      r(3) = p(1)*q(2) - p(2)*q(1)
-
-      end
-
-*******************
       subroutine solvesystem(E1,E2,s1,s2,Qx,Qy,phi1,phi2)
       implicit none
       real*8 E1,E2,s1,s2,Qx,Qy,phi1,phi2
@@ -263,6 +272,234 @@ c      return
       endif
       return
       end
+*****************************************      
+      function setrez(a)
+      double complex a,setrez
+      setrez=(a-conjg(a))/2.d0
+      return
+      end
+      
+**********************
+      
+      function setrezq(a)
+      complex*32 a,setrezq
+      setrezq=(a-conjg(a))/2.q0
+      return
+      end
+************************      
+      function check_invariants(p1,p2,p3,p4,q)
+      implicit double precision (x)
+      real*8 qph(40,0:3),p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3),pt(0:3)
+      real*8 p4t(0:3),p3t(0:3)
+      external dot
+      real*8 dot
+      external tridot
+      real*8 tridot
+
+      real*8 th1,th2,th3,th4,pi
+      common/checkinvariants/lim,switchcollier                                                                                                                                         
+      integer switchcollier
+      double precision lim
+
+      common/lt/ltint,quadevents,ilt
+      integer ltint,quadevents,ilt
+      
+      common/gvmdchecks/iscoll,fscoll
+      integer iscoll,fscoll
+
+      ltint =0
+      iscoll=0
+      fscoll=0
+      
+      x12  =dot(p1,p2)
+      x13  =dot(p1,p3)
+      x14  =dot(p1,p4)
+      x15  =dot(p1,q)
+      x23  =dot(p2,p3)
+      x24  =dot(p2,p4)
+      x25 = dot(p2,q)
+      x34 = dot(p3,p4)
+      x35 = dot(p3,q)
+      x45 = dot(p4,q)
+      
+      if((abs(x12).le.lim.or.
+     > abs(x13).le.lim.or.
+     > abs(x14).le.lim.or.
+     > abs(x15).le.lim.or.
+     > abs(x23).le.lim.or.
+     > abs(x24).le.lim.or.
+     > abs(x25).le.lim.or.
+     > abs(x34).le.lim.or.
+     > abs(x35).le.lim.or.
+     > abs(x45).le.lim)) then
+         ltint=1
+         quadevents=quadevents+1
+         iscoll=1
+         fscoll=1
+      endif
+      pi = 4.d0*atan(1.d0)
+
+      th1= tridot(p1,q)/dsqrt(tridot(p1,p1)*q(0)**2)
+      th2= tridot(p2,q)/dsqrt(tridot(p2,p2)*q(0)**2)
+      th3= tridot(p3,q)/dsqrt(tridot(p3,p3)*q(0)**2)
+      th4= tridot(p4,q)/dsqrt(tridot(p4,p4)*q(0)**2)
+
+      if((abs(acos(th1)).le.1.d-5).or.(abs(acos(th2)).le.1.d-5)) then
+         iscoll=1
+      endif
+*--------THIS TO CHECK WETHER P3 AND P4 ARE ALMOST LINEAR DEPENDENT--------*
+*--------WE BUILD THE ORTOGONAL COMPONENT OF P4 W.R.T. P3------------------*
+      p4t=p4/dsqrt(tridot(p4,p4))
+      p3t=p3/dsqrt(tridot(p3,p3))
+      pt=p4t-tridot(p3t,p4t)*p3t/tridot(p3t,p3t)
+
+      if(dsqrt(tridot(pt,pt)).le.1d-2) then
+         fscoll=1
+      endif
+!      iscoll=1
+!      fscoll=1
+      end
+
+*******************************************************************************
+      subroutine getsignalphot(p1,p2,p3,p4,qph,ng,ind,qind)
+      implicit none
+      real*8 qph(40,0:3),p1(0:3),p2(0:3),p3(0:3),p4(0:3),q(0:3)
+      real*8 enhard,spd,spdi,c1,c2,c3,c4,enphot,en
+      integer k,i,ind,qind,ng
+      external dot
+      real*8 dot
+      external tridot
+      real*8 tridot
+      real*8 sang1,sang2,sang3,sang4
+      common/cutphot/phind
+      integer phind
+      common/radoption/ifisrfsr
+      integer ifisrfsr
+      logical cond
+      character*2 fs
+      common/finalstate/fs
+
+*******THE ME PHOTON IS CHOSEN AS THE HARDEST
+      cond=(fs.eq.'mr'.or.fs.eq.'pr')
+
+        if(ind.eq.1) then
+         enhard =0d0
+
+         do i = 1,ng
+            if(qph(i,0).gt.0.d0) then
+               enphot = qph(i,0)
+               if (enphot.ge.enhard) then
+                  enhard = enphot
+                  qind = i
+               else
+
+               endif
+            endif
+         enddo
+         return
+	endif
+******THE ME PHOTON IS CHOSEN AS ANTI-KT
+
+	if(ind.eq.2) then
+c$$$           spd = 1.d12
+c$$$           do k = 1,ng
+c$$$              q=qph(k,:)
+c$$$              c1=1/(q(1)**2+q(2)**2)
+c$$$              if(c1.le.spd) then
+c$$$                 spd=c1
+c$$$                 qind=k
+c$$$              endif
+c$$$  enddo
+           spd = 0.d0
+           do k = 1,ng
+              q=qph(k,:)
+              c1=dot(q,p1)
+              c2=dot(q,p2)
+              if(c1.le.c2) spdi=c1
+              if(c2.le.c1) spdi=c2
+              if(spdi.ge.spd) then
+                 spd=spdi
+                 qind=k
+              endif
+           enddo
+           
+        endif
+
+******THE ME PHOTON IS CHOSE AS THE CKKW-FARTHEST FROM THE CHARGED LEGS
+	if(ind.eq.3) then
+
+           spd=0.d0
+
+           do k = 1,ng
+
+              q = qph(k,:)
+
+              if(q(0).le.p1(0)) then
+                 en=q(0)**2.d0
+              else
+                 en=p1(0)**2.d0
+              endif
+              c1=en*(1-tridot(p1,q)/dsqrt(tridot(p1,p1))/q(0))
+
+              if(q(0).le.p2(0)) then
+                 en=q(0)**2.d0
+              else
+                 en=p2(0)**2.d0
+              endif
+              c2=en*(1-tridot(p2,q)/dsqrt(tridot(p2,p2))/q(0))
+
+              if(q(0).le.p3(0)) then
+                 en=q(0)**2.d0
+              else
+                 en=p3(0)**2.d0
+              endif
+              c3=en*(1-tridot(p3,q)/dsqrt(tridot(p3,p3))/q(0))
+
+              if(q(0).le.p4(0)) then
+                 en=q(0)**2.d0
+              else
+                 en=p4(0)**2.d0
+              endif
+              c4=en*(1-tridot(p4,q)/dsqrt(tridot(p4,p4))/q(0))
+
+              if (c1.le.c2.and.c1.le.c3.and.c1.le.c4) spdi =c1
+              if (c2.le.c1.and.c2.le.c3.and.c2.le.c4) spdi =c2
+              if (c3.le.c2.and.c3.le.c1.and.c3.le.c4) spdi =c3
+              if (c4.le.c1.and.c4.le.c2.and.c4.le.c3) spdi =c4
+
+              if (cond.and.ifisrfsr.eq.10) then
+                 if (c1.lt.c2) spdi = c1
+                 if (c2.lt.c1) spdi = c2
+              elseif (cond.and.ifisrfsr.eq.01) then
+                 if (c3.lt.c4) spdi = c3
+                 if (c4.lt.c3) spdi = c4
+              endif
+
+              if(spdi.ge.spd) then
+                 spd=spdi
+                 qind=k
+              endif
+           enddo
+         return
+	 endif
+         
+         return
+	end
+***********
+      subroutine cross_product(p, q, r)
+      implicit none
+      real(8) p(0:3), q(0:3) ! due quadrivettori in input
+      real(8) r(0:3) ! risultato: prodotto vettoriale delle parti spaziali
+
+! calcolo del prodotto vettoriale solo sulle componenti 1:3
+      r(0) = 0
+      r(1) = p(2)*q(3) - p(3)*q(2)
+      r(2) = p(3)*q(1) - p(1)*q(3)
+      r(3) = p(1)*q(2) - p(2)*q(1)
+
+      end
+
+*******************
 *******************************************************************************
       subroutine gettwophot(p1,p2,p3,p4,qph,ng,qind,qind2)
       implicit none
@@ -276,6 +513,16 @@ c      return
       integer k,i,ind,qind,ng,qind2
       external dot
       real*8 dot
+      common/radoption/ifisrfsr
+      integer ifisrfsr
+      logical cond
+      character*2 fs
+      common/finalstate/fs
+
+      cond=(fs.eq.'mr'.or.fs.eq.'pr')
+
+      
+      
         qphi=qph
         spd=0d0
 
@@ -319,6 +566,15 @@ c      return
                 if (c2.le.c1.and.c2.le.c3.and.c2.le.c4) spdi =c2
                 if (c3.le.c2.and.c3.le.c1.and.c3.le.c4) spdi =c3
                 if (c4.le.c1.and.c4.le.c2.and.c4.le.c3) spdi =c4
+
+                if (cond.and.ifisrfsr.eq.10) then
+                   if (c1.lt.c2) spdi = c1
+                   if (c2.lt.c1) spdi = c2
+                elseif (cond.and.ifisrfsr.eq.01) then
+                   if (c3.lt.c4) spdi = c3
+                   if (c4.lt.c3) spdi = c4
+                endif
+
                 if(spdi.ge.spd) then
                    spd=spdi
                    qind=k
@@ -370,6 +626,14 @@ c      return
                 if (c2.le.c1.and.c2.le.c3.and.c2.le.c4) spdi =c2
                 if (c3.le.c2.and.c3.le.c1.and.c3.le.c4) spdi =c3
 		if (c4.le.c1.and.c4.le.c2.and.c4.le.c3) spdi =c4
+
+                if (cond.and.ifisrfsr.eq.10) then
+                   if (c1.lt.c2) spdi = c1
+                   if (c2.lt.c1) spdi = c2
+                elseif (cond.and.ifisrfsr.eq.01) then
+                   if (c3.lt.c4) spdi = c3
+                   if (c4.lt.c3) spdi = c4
+                endif
 
                 if(spdi.ge.spd) then
                    spd=spdi
@@ -1447,6 +1711,16 @@ c     x      = (g - 1.d0)*ppdv/v2 - g*pp(0)
       end
 
 *****
+      function qdot(p,q)
+      implicit none
+      real*16 qdot
+      real*16 p(0:3),q(0:3)
+
+      qdot=p(0)*q(0)-p(1)*q(1)-p(2)*q(2)-p(3)*q(3)
+      return
+      end
+
+*****************      
       function dotq(p,q)
       real*16 dotq
       double precision p(0:3),q(0:3)
@@ -2008,1107 +2282,8 @@ c QEUSTO È PER IMPLEMENTARE IL PRODOTTO SCALARE TRA UNA MATRICE E UN VETTORE, Q
       average= (closest(1)+closest(2))/2d0
 
       end
-
 !
 *********
-      subroutine routing_mumu_old(amme,mmu,pt1,pt2,pt3,pt4,qt,
-     >				 momvec,mominv,masses,i,elmat,ifc)
-
-#ifdef COLLIER
-        use collier
-#endif
-        implicit none
-
-	double precision pt1(0:3),pt2(0:3),pt3(0:3),pt4(0:3),qt(0:3)
-	double precision pt(0:3)
-	real*8 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
-	double precision amme,mmu,s,s1,me2,me4,mm2,mm4
-
-        external vpolc
-        double complex vpolc,alphar
-
-        common/ialpharunning/iarun
-        integer iarun
-
-
-	double complex tens(1:35)
-	double complex tensuv(1:35)
-
-	character*3 ifc
-
-	double complex masses(0:4)
-	double complex mominv(1:10)
-	double complex momvec(0:3,4)
-
-	double precision E0L
-	double precision Evec(0:3)
-	double precision Er2(0:9),Er2m(0:3,0:3)
-	double precision Er3(0:19),Er3m(0:3,0:3,0:3)
-
-	real*8 elmat,elmat1
-
-	integer i,k,l,m,n,o,p
-
-	double precision p1a
-	double precision p2a
-	double precision p3a
-	double precision p4a
-	double precision ka
-
-	double precision gab
-
-	double precision p1ap1b
-	double precision p1ap2b
-	double precision p1ap3b
-	double precision p1ap4b
-	double precision kap1b
-	double precision p2ap2b
-	double precision p2ap3b
-	double precision p2ap4b
-	double precision kap2b
-	double precision p3ap3b
-	double precision p3ap4b
-	double precision kap3b
-	double precision p4ap4b
-	double precision kap4b
-	double precision kakb
-
-	double precision p1ap1bp2c
-	double precision p1ap1bp3c
-	double precision p1ap1bp4c
-	double precision kap1bp1c
-	double precision p1ap2bp2c
-	double precision p1ap2bp3c
-	double precision p1ap2bp4c
-	double precision kap1bp2c
-	double precision p1ap3bp3c
-	double precision p1ap3bp4c
-	double precision kap1bp3c
-	double precision p1ap4bp4c
-	double precision kap1bp4c
-	double precision p2ap2bp3c
-	double precision p2ap2bp4c
-	double precision kap2bp2c
-	double precision p2ap3bp3c
-	double precision p2ap3bp4c
-	double precision kap2bp3c
-	double precision p2ap4bp4c
-	double precision kap2bp4c
-	double precision p3ap3bp4c
-	double precision kap3bp3c
-	double precision p3ap4bp4c
-	double precision kap3bp4c
-	double precision kap4bp4c
-
-	double precision gabkc
-	double precision gabp1c
-	double precision gabp2c
-	double precision gabp3c
-	double precision gabp4c
-
-	external dot
-	double precision dot
-
-
-
-	p1p2 = dot(pt1,pt2)
-	p1p3 = dot(pt1,pt3)
-	p1p4 = dot(pt1,pt4)
-	kp1  = dot(pt1,qt)
-	p2p3 = dot(pt2,pt3)
-	p2p4 = dot(pt2,pt4)
-	kp2  = dot(pt2,qt)
-	kp3 = dot(pt3,qt)
-	p3p4 = dot(pt3,pt4)
-	kp4  = dot(pt4,qt)
-	s=dot(pt1+pt2,pt1+pt2)
-	s1=dot(pt3+pt4,pt3+pt4)
-
-
-
-#ifdef COLLIER
-
-	call Eten_cll(tens,tensuv,momvec,mominv,masses,3)
-
-#endif
-
-
-
-************QUI PRENDIAMO I VARI ELEMENTI DI TENS E ISOLIAMO QUELLO SCALARE, VETTORIALE, TENSORIALE DI RANK2 E 3
-
-	E0L=real(tens(1))
-
-	Evec(0)=real(tens(2))
-	Evec(1)=real(tens(3))
-	Evec(2)=real(tens(4))
-	Evec(3)=real(tens(5))
-
-	Er2(0)=real(tens(6))
-
-	Er2(1)=real(tens(7))
-
-	Er2(2)=real(tens(8))
-
-	Er2(3)=real(tens(9))
-	Er2(4)=real(tens(10))
-	Er2(5)=real(tens(11))
-	Er2(6)=real(tens(12))
-	Er2(7)=real(tens(13))
-	Er2(8)=real(tens(14))
-	Er2(9)=real(tens(15))
-        if(ifc.eq.'is1') print*,'vettoriali',E0L,Evec
-      Er2m(0,0)=Er2(0)
-      Er2m(0,1)=Er2(1)
-      Er2m(1,0)=Er2(1)
-      Er2m(2,0)=Er2(2)
-      Er2m(0,2)=Er2(2)
-      Er2m(3,0)=Er2(3)
-      Er2m(0,3)=Er2(3)
-      Er2m(1,1)=Er2(4)
-      Er2m(1,2)=Er2(5)
-      Er2m(2,1)=Er2(5)
-      Er2m(1,3)=Er2(6)
-      Er2m(3,1)=Er2(6)
-      Er2m(2,2)=Er2(7)
-      Er2m(2,3)=Er2(8)
-      Er2m(3,2)=Er2(8)
-      Er2m(3,3)=Er2(9)
-
-	Er3(0)=real(tens(16))
-	Er3(1)=real(tens(17))
-	Er3(2)=real(tens(18))
-	Er3(3)=real(tens(19))
-	Er3(4)=real(tens(20))
-	Er3(5)=real(tens(21))
-	Er3(6)=real(tens(22))
-	Er3(7)=real(tens(23))
-	Er3(8)=real(tens(24))
-	Er3(9)=real(tens(25))
-	Er3(10)=real(tens(26))
-	Er3(11)=real(tens(27))
-	Er3(12)=real(tens(28))
-	Er3(13)=real(tens(29))
-	Er3(14)=real(tens(30))
-	Er3(15)=real(tens(31))
-	Er3(16)=real(tens(32))
-	Er3(17)=real(tens(33))
-	Er3(18)=real(tens(34))
-	Er3(19)=real(tens(35))
-
-	Er3m(0, 0, 0) = Er3(0)
-	Er3m(0, 0, 1) = Er3(1)
-	Er3m(0, 1, 0) = Er3(1)
-	Er3m(1, 0, 0) = Er3(1)
-	Er3m(0, 0, 2) = Er3(2)
-	Er3m(0, 2, 0) = Er3(2)
-	Er3m(2, 0, 0) = Er3(2)
-	Er3m(0, 0, 3) = Er3(3)
-	Er3m(0, 3, 0) = Er3(3)
-	Er3m(3, 0, 0) = Er3(3)
-	Er3m(0, 1, 1) = Er3(4)
-	Er3m(1, 0, 1) = Er3(4)
-	Er3m(1, 1, 0) = Er3(4)
-	Er3m(0, 1, 2) = Er3(5)
-	Er3m(0, 2, 1) = Er3(5)
-	Er3m(1, 0, 2) = Er3(5)
-	Er3m(1, 2, 0) = Er3(5)
-	Er3m(2, 0, 1) = Er3(5)
-	Er3m(2, 1, 0) = Er3(5)
-	Er3m(0, 1, 3) = Er3(6)
-	Er3m(0, 3, 1) = Er3(6)
-	Er3m(1, 0, 3) = Er3(6)
-	Er3m(1, 3, 0) = Er3(6)
-	Er3m(3, 0, 1) = Er3(6)
-	Er3m(3, 1, 0) = Er3(6)
-	Er3m(0, 2, 2) = Er3(7)
-	Er3m(2, 0, 2) = Er3(7)
-	Er3m(2, 2, 0) = Er3(7)
-	Er3m(0, 2, 3) = Er3(8)
-	Er3m(0, 3, 2) = Er3(8)
-	Er3m(2, 0, 3) = Er3(8)
-	Er3m(2, 3, 0) = Er3(8)
-	Er3m(3, 0, 2) = Er3(8)
-	Er3m(3, 2, 0) = Er3(8)
-	Er3m(0, 3, 3) = Er3(9)
-	Er3m(3, 0, 3) = Er3(9)
-	Er3m(3, 3, 0) = Er3(9)
-	Er3m(1, 1, 1) = Er3(10)
-	Er3m(1, 1, 2) = Er3(11)
-	Er3m(1, 2, 1) = Er3(11)
-	Er3m(2, 1, 1) = Er3(11)
-	Er3m(1, 1, 3) = Er3(12)
-	Er3m(1, 3, 1) = Er3(12)
-	Er3m(3, 1, 1) = Er3(12)
-	Er3m(1, 2, 2) = Er3(13)
-	Er3m(2, 1, 2) = Er3(13)
-	Er3m(2, 2, 1) = Er3(13)
-	Er3m(1, 2, 3) = Er3(14)
-	Er3m(1, 3, 2) = Er3(14)
-	Er3m(2, 1, 3) = Er3(14)
-	Er3m(2, 3, 1) = Er3(14)
-	Er3m(3, 1, 2) = Er3(14)
-	Er3m(3, 2, 1) = Er3(14)
-	Er3m(1, 3, 3) = Er3(15)
-	Er3m(3, 1, 3) = Er3(15)
-	Er3m(3, 3, 1) = Er3(15)
-	Er3m(2, 2, 2) = Er3(16)
-	Er3m(2, 2, 3) = Er3(17)
-	Er3m(2, 3, 2) = Er3(17)
-	Er3m(3, 2, 2) = Er3(17)
-	Er3m(2, 3, 3) = Er3(18)
-	Er3m(3, 2, 3) = Er3(18)
-	Er3m(3, 3, 2) = Er3(18)
-	Er3m(3, 3, 3) = Er3(19)
-
-***************vettoriali
-
-	p1a=dot(pt1,Evec)
-	p2a=dot(pt2,Evec)
-	p3a=dot(pt3,Evec)
-	p4a=dot(pt4,Evec)
-	ka=dot(qt,Evec)
-
-*********rango 2
-
-	call rank2(Er2,pt3,qt,2,gab)
-
-	call rank2(Er2,pt1,pt1,1,p1ap1b)
-
-	call rank2(Er2,pt1,pt2,1,p1ap2b)
-
-	call rank2(Er2,pt1,pt3,1,p1ap3b)
-
-	call rank2(Er2,pt1,pt4,1,p1ap4b)
-
-	call rank2(Er2,pt1,qt,1,kap1b)
-
-	call rank2(Er2,pt2,pt2,1,p2ap2b)
-
-	call rank2(Er2,pt2,pt3,1,p2ap3b)
-
-	call rank2(Er2,pt2,pt4,1,p2ap4b)
-
-	call rank2(Er2,pt2,qt,1,kap2b)
-
-	call rank2(Er2,pt3,pt3,1,p3ap3b)
-
-	call rank2(Er2,pt3,pt4,1,p3ap4b)
-
-	call rank2(Er2,pt3,qt,1,kap3b)
-
-	call rank2(Er2,pt4,pt4,1,p4ap4b)
-
-	call rank2(Er2,pt4,qt,1,kap4b)
-
-	call rank2(Er2,qt,qt,1,kakb)
-
-**********************rango 3
-
-	call rank3(Er3,pt1,pt1,pt2,1,p1ap1bp2c)
-
-	call rank3(Er3,pt1,pt1,pt3,1,p1ap1bp3c)
-
-	call rank3(Er3,pt1,pt1,pt4,1,p1ap1bp4c)
-
-	call rank3(Er3,pt1,pt1,qt,1,kap1bp1c)
-
-	call rank3(Er3,pt1,pt2,pt2,1,p1ap2bp2c)
-
-	call rank3(Er3,pt1,pt2,pt3,1,p1ap2bp3c)
-
-	call rank3(Er3,pt1,pt2,pt4,1,p1ap2bp4c)
-
-	call rank3(Er3,pt1,pt2,qt,1,kap1bp2c)
-
-	call rank3(Er3,pt1,pt3,pt3,1, p1ap3bp3c)
-
-	call rank3(Er3,pt1,pt3,pt4,1, p1ap3bp4c)
-
-	call rank3(Er3,pt1,pt3,qt,1, kap1bp3c)
-
-	call rank3(Er3,pt1,pt4,pt4,1, p1ap4bp4c)
-
-	call rank3(Er3,pt1,pt4,qt,1, kap1bp4c)
-
-	call rank3(Er3,pt2,pt2,pt3,1, p2ap2bp3c)
-
-	call rank3(Er3,pt2,pt2,pt4,1, p2ap2bp4c)
-
-	call rank3(Er3,pt2,pt2,qt,1, kap2bp2c)
-
-	call rank3(Er3,pt2,pt3,pt3,1, p2ap3bp3c)
-
-	call rank3(Er3,pt2,pt3,pt4,1, p2ap3bp4c)
-
-	call rank3(Er3,pt2,pt3,qt,1, kap2bp3c)
-
-	call rank3(Er3,pt2,pt4,pt4,1, p2ap4bp4c)
-
-	call rank3(Er3,pt2,pt4,qt,1,  kap2bp4c)
-
-	call rank3(Er3,pt3,pt3,pt4,1, p3ap3bp4c)
-
-	call rank3(Er3,pt3,pt3,qt,1, kap3bp3c)
-
-	call rank3(Er3,pt3,pt4,pt4,1, p3ap4bp4c)
-
-	call rank3(Er3,pt3,pt4,qt,1, kap3bp4c)
-
-
-	call rank3(Er3,pt4,pt4,qt,1, kap4bp4c)
-
-	call rank3(Er3,pt1,pt4,qt,2, gabkc)
-
-	call rank3(Er3,pt1,pt4,pt1,2, gabp1c)
-
-	call rank3(Er3,pt1,pt4,pt2,2, gabp2c)
-
-	call rank3(Er3,pt1,pt4,pt3,2, gabp3c)
-
-	call rank3(Er3,pt1,pt4,pt4,2, gabp4c)
-
-
-	elmat=0d0
-*****SOLO IL ROUTING 5 È USATO, PERÒ LASCIO COMUNQUE IL CODICE COMMENTATO SE MAI SERVISSERO DEI TEST
-
-	if(i.eq.1) then
-	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing1.F'
-            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
-
-        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    else
-		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    endif
-
-
-    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing1.F'
-	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
-
-	elseif(i.eq.2) then
-	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing2.F'
-            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
-        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    else
-		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    endif
-
-    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing2.F'
-	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
-	elseif(i.eq.3) then
-  	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing3.F'
-            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
-        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    else
-		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    endif
-
-    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing3.F'
-	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
-	elseif(i.eq.4) then
-    	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing4.F'
-            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
-        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    else
-		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    endif
-    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing4.F'
-	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
-!
-	elseif(i.eq.5) then
-	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing5.F'
-
-            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
-
-        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    else
-		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    endif
-    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing5.F'
-	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
-	endif
-
-      end
-************************
-      subroutine routing_mumu(amme,mmu,pt1,pt2,pt3,pt4,qt,
-     >				 momvec,mominv,masses,i,elmat,ifc)
-
-#ifdef COLLIER
-        use collier
-#endif
-        implicit none
-
-	double precision pt1(0:3),pt2(0:3),pt3(0:3),pt4(0:3),qt(0:3)
-	double precision pt(0:3)
-	real*8 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
-	double precision amme,mmu,s,s1,me2,me4,mm2,mm4
-
-        external vpolc
-        double complex vpolc,alphar
-
-        common/ialpharunning/iarun
-        integer iarun
-
-
-	double complex tens(1:35)
-	double complex tensuv(1:35)
-
-	character*3 ifc
-
-	double complex masses(0:4)
-	double complex mominv(1:10)
-	double complex momvec(0:3,4)
-
-	double complex E0L
-	double complex Evec(0:3)
-	double complex Er2(0:9),Er2m(0:3,0:3)
-	double complex Er3(0:19),Er3m(0:3,0:3,0:3)
-
-	double complex elmat,elmat1
-
-	integer i,k,l,m,n,o,p
-
-	double complex p1a
-	double complex p2a
-	double complex p3a
-	double complex p4a
-	double complex ka
-
-        DOUBLE COMPLEX gab
-
-        DOUBLE COMPLEX p1ap1b
-        DOUBLE COMPLEX p1ap2b
-        DOUBLE COMPLEX p1ap3b
-        DOUBLE COMPLEX p1ap4b
-        DOUBLE COMPLEX kap1b
-        DOUBLE COMPLEX p2ap2b
-        DOUBLE COMPLEX p2ap3b
-        DOUBLE COMPLEX p2ap4b
-        DOUBLE COMPLEX kap2b
-        DOUBLE COMPLEX p3ap3b
-        DOUBLE COMPLEX p3ap4b
-        DOUBLE COMPLEX kap3b
-        DOUBLE COMPLEX p4ap4b
-        DOUBLE COMPLEX kap4b
-        DOUBLE COMPLEX kakb
-
-        DOUBLE COMPLEX p1ap1bp2c
-        DOUBLE COMPLEX p1ap1bp3c
-        DOUBLE COMPLEX p1ap1bp4c
-        DOUBLE COMPLEX kap1bp1c
-        DOUBLE COMPLEX p1ap2bp2c
-        DOUBLE COMPLEX p1ap2bp3c
-        DOUBLE COMPLEX p1ap2bp4c
-        DOUBLE COMPLEX kap1bp2c
-        DOUBLE COMPLEX p1ap3bp3c
-        DOUBLE COMPLEX p1ap3bp4c
-        DOUBLE COMPLEX kap1bp3c
-        DOUBLE COMPLEX p1ap4bp4c
-        DOUBLE COMPLEX kap1bp4c
-        DOUBLE COMPLEX p2ap2bp3c
-        DOUBLE COMPLEX p2ap2bp4c
-        DOUBLE COMPLEX kap2bp2c
-        DOUBLE COMPLEX p2ap3bp3c
-        DOUBLE COMPLEX p2ap3bp4c
-        DOUBLE COMPLEX kap2bp3c
-        DOUBLE COMPLEX p2ap4bp4c
-        DOUBLE COMPLEX kap2bp4c
-        DOUBLE COMPLEX p3ap3bp4c
-        DOUBLE COMPLEX kap3bp3c
-        DOUBLE COMPLEX p3ap4bp4c
-        DOUBLE COMPLEX kap3bp4c
-        DOUBLE COMPLEX kap4bp4c
-
-        DOUBLE COMPLEX gabkc
-        DOUBLE COMPLEX gabp1c
-        DOUBLE COMPLEX gabp2c
-        DOUBLE COMPLEX gabp3c
-        DOUBLE COMPLEX gabp4c
-
-	external dot
-	double precision dot
-
-
-
-	p1p2 = dot(pt1,pt2)
-	p1p3 = dot(pt1,pt3)
-	p1p4 = dot(pt1,pt4)
-	kp1  = dot(pt1,qt)
-	p2p3 = dot(pt2,pt3)
-	p2p4 = dot(pt2,pt4)
-	kp2  = dot(pt2,qt)
-	kp3 = dot(pt3,qt)
-	p3p4 = dot(pt3,pt4)
-	kp4  = dot(pt4,qt)
-	s=dot(pt1+pt2,pt1+pt2)
-	s1=dot(pt3+pt4,pt3+pt4)
-
-
-
-#ifdef COLLIER
-
-	call Eten_cll(tens,tensuv,momvec,mominv,masses,3)
-
-#endif
-
-
-
-************QUI PRENDIAMO I VARI ELEMENTI DI TENS E ISOLIAMO QUELLO SCALARE, VETTORIALE, TENSORIALE DI RANK2 E 3
-        E0L = tens(1)
-
-        Evec(0) = tens(2)
-        Evec(1) = tens(3)
-        Evec(2) = tens(4)
-        Evec(3) = tens(5)
-
-        Er2(0) = tens(6)
-        Er2(1) = tens(7)
-        Er2(2) = tens(8)
-        Er2(3) = tens(9)
-        Er2(4) = tens(10)
-        Er2(5) = tens(11)
-        Er2(6) = tens(12)
-        Er2(7) = tens(13)
-        Er2(8) = tens(14)
-        Er2(9) = tens(15)
-
-      Er2m(0,0)=Er2(0)
-      Er2m(0,1)=Er2(1)
-      Er2m(1,0)=Er2(1)
-      Er2m(2,0)=Er2(2)
-      Er2m(0,2)=Er2(2)
-      Er2m(3,0)=Er2(3)
-      Er2m(0,3)=Er2(3)
-      Er2m(1,1)=Er2(4)
-      Er2m(1,2)=Er2(5)
-      Er2m(2,1)=Er2(5)
-      Er2m(1,3)=Er2(6)
-      Er2m(3,1)=Er2(6)
-      Er2m(2,2)=Er2(7)
-      Er2m(2,3)=Er2(8)
-      Er2m(3,2)=Er2(8)
-      Er2m(3,3)=Er2(9)
-
-      Er3(0) = tens(16)
-      Er3(1) = tens(17)
-      Er3(2) = tens(18)
-      Er3(3) = tens(19)
-      Er3(4) = tens(20)
-      Er3(5) = tens(21)
-      Er3(6) = tens(22)
-      Er3(7) = tens(23)
-      Er3(8) = tens(24)
-      Er3(9) = tens(25)
-      Er3(10) = tens(26)
-      Er3(11) = tens(27)
-      Er3(12) = tens(28)
-      Er3(13) = tens(29)
-      Er3(14) = tens(30)
-      Er3(15) = tens(31)
-      Er3(16) = tens(32)
-      Er3(17) = tens(33)
-      Er3(18) = tens(34)
-      Er3(19) = tens(35)
-
-	Er3m(0, 0, 0) = Er3(0)
-	Er3m(0, 0, 1) = Er3(1)
-	Er3m(0, 1, 0) = Er3(1)
-	Er3m(1, 0, 0) = Er3(1)
-	Er3m(0, 0, 2) = Er3(2)
-	Er3m(0, 2, 0) = Er3(2)
-	Er3m(2, 0, 0) = Er3(2)
-	Er3m(0, 0, 3) = Er3(3)
-	Er3m(0, 3, 0) = Er3(3)
-	Er3m(3, 0, 0) = Er3(3)
-	Er3m(0, 1, 1) = Er3(4)
-	Er3m(1, 0, 1) = Er3(4)
-	Er3m(1, 1, 0) = Er3(4)
-	Er3m(0, 1, 2) = Er3(5)
-	Er3m(0, 2, 1) = Er3(5)
-	Er3m(1, 0, 2) = Er3(5)
-	Er3m(1, 2, 0) = Er3(5)
-	Er3m(2, 0, 1) = Er3(5)
-	Er3m(2, 1, 0) = Er3(5)
-	Er3m(0, 1, 3) = Er3(6)
-	Er3m(0, 3, 1) = Er3(6)
-	Er3m(1, 0, 3) = Er3(6)
-	Er3m(1, 3, 0) = Er3(6)
-	Er3m(3, 0, 1) = Er3(6)
-	Er3m(3, 1, 0) = Er3(6)
-	Er3m(0, 2, 2) = Er3(7)
-	Er3m(2, 0, 2) = Er3(7)
-	Er3m(2, 2, 0) = Er3(7)
-	Er3m(0, 2, 3) = Er3(8)
-	Er3m(0, 3, 2) = Er3(8)
-	Er3m(2, 0, 3) = Er3(8)
-	Er3m(2, 3, 0) = Er3(8)
-	Er3m(3, 0, 2) = Er3(8)
-	Er3m(3, 2, 0) = Er3(8)
-	Er3m(0, 3, 3) = Er3(9)
-	Er3m(3, 0, 3) = Er3(9)
-	Er3m(3, 3, 0) = Er3(9)
-	Er3m(1, 1, 1) = Er3(10)
-	Er3m(1, 1, 2) = Er3(11)
-	Er3m(1, 2, 1) = Er3(11)
-	Er3m(2, 1, 1) = Er3(11)
-	Er3m(1, 1, 3) = Er3(12)
-	Er3m(1, 3, 1) = Er3(12)
-	Er3m(3, 1, 1) = Er3(12)
-	Er3m(1, 2, 2) = Er3(13)
-	Er3m(2, 1, 2) = Er3(13)
-	Er3m(2, 2, 1) = Er3(13)
-	Er3m(1, 2, 3) = Er3(14)
-	Er3m(1, 3, 2) = Er3(14)
-	Er3m(2, 1, 3) = Er3(14)
-	Er3m(2, 3, 1) = Er3(14)
-	Er3m(3, 1, 2) = Er3(14)
-	Er3m(3, 2, 1) = Er3(14)
-	Er3m(1, 3, 3) = Er3(15)
-	Er3m(3, 1, 3) = Er3(15)
-	Er3m(3, 3, 1) = Er3(15)
-	Er3m(2, 2, 2) = Er3(16)
-	Er3m(2, 2, 3) = Er3(17)
-	Er3m(2, 3, 2) = Er3(17)
-	Er3m(3, 2, 2) = Er3(17)
-	Er3m(2, 3, 3) = Er3(18)
-	Er3m(3, 2, 3) = Er3(18)
-	Er3m(3, 3, 2) = Er3(18)
-	Er3m(3, 3, 3) = Er3(19)
-
-***************vettoriali
-        p1a=dot(pt1,REAL(Evec))+(0.d0,1.d0)*dot(pt1,AIMAG(Evec))
-        p2a=dot(pt2,REAL(Evec))+(0.d0,1.d0)*dot(pt2,AIMAG(Evec))
-	p3a=dot(pt3,REAL(Evec))+(0.d0,1.d0)*dot(pt3,AIMAG(Evec))
-	p4a=dot(pt4,REAL(Evec))+(0.d0,1.d0)*dot(pt4,AIMAG(Evec))
-        ka=dot(qt,REAL(Evec))+(0.d0,1.d0)*dot(qt,AIMAG(Evec))
-
-*********rango 2
-
-        call rank2_c(Er2,pt3,qt,2,gab)
-
-        call rank2_c(Er2,pt1,pt1,1,p1ap1b)
-
-        call rank2_c(Er2,pt1,pt2,1,p1ap2b)
-
-        call rank2_c(Er2,pt1,pt3,1,p1ap3b)
-
-        call rank2_c(Er2,pt1,pt4,1,p1ap4b)
-
-        call rank2_c(Er2,pt1,qt,1,kap1b)
-
-        call rank2_c(Er2,pt2,pt2,1,p2ap2b)
-
-        call rank2_c(Er2,pt2,pt3,1,p2ap3b)
-
-        call rank2_c(Er2,pt2,pt4,1,p2ap4b)
-
-        call rank2_c(Er2,pt2,qt,1,kap2b)
-
-        call rank2_c(Er2,pt3,pt3,1,p3ap3b)
-
-        call rank2_c(Er2,pt3,pt4,1,p3ap4b)
-
-        call rank2_c(Er2,pt3,qt,1,kap3b)
-
-        call rank2_c(Er2,pt4,pt4,1,p4ap4b)
-
-        call rank2_c(Er2,pt4,qt,1,kap4b)
-
-        call rank2_c(Er2,qt,qt,1,kakb)
-
-**********************rango 3
-
-        call rank3_c(Er3,pt1,pt1,pt2,1,p1ap1bp2c)
-
-        call rank3_c(Er3,pt1,pt1,pt3,1,p1ap1bp3c)
-
-        call rank3_c(Er3,pt1,pt1,pt4,1,p1ap1bp4c)
-
-        call rank3_c(Er3,pt1,pt1,qt,1,kap1bp1c)
-
-        call rank3_c(Er3,pt1,pt2,pt2,1,p1ap2bp2c)
-
-        call rank3_c(Er3,pt1,pt2,pt3,1,p1ap2bp3c)
-
-        call rank3_c(Er3,pt1,pt2,pt4,1,p1ap2bp4c)
-
-        call rank3_c(Er3,pt1,pt2,qt,1,kap1bp2c)
-
-        call rank3_c(Er3,pt1,pt3,pt3,1,p1ap3bp3c)
-
-        call rank3_c(Er3,pt1,pt3,pt4,1,p1ap3bp4c)
-
-        call rank3_c(Er3,pt1,pt3,qt,1,kap1bp3c)
-
-        call rank3_c(Er3,pt1,pt4,pt4,1,p1ap4bp4c)
-
-        call rank3_c(Er3,pt1,pt4,qt,1,kap1bp4c)
-
-        call rank3_c(Er3,pt2,pt2,pt3,1,p2ap2bp3c)
-
-        call rank3_c(Er3,pt2,pt2,pt4,1,p2ap2bp4c)
-
-        call rank3_c(Er3,pt2,pt2,qt,1,kap2bp2c)
-
-        call rank3_c(Er3,pt2,pt3,pt3,1,p2ap3bp3c)
-
-        call rank3_c(Er3,pt2,pt3,pt4,1,p2ap3bp4c)
-
-        call rank3_c(Er3,pt2,pt3,qt,1,kap2bp3c)
-
-        call rank3_c(Er3,pt2,pt4,pt4,1,p2ap4bp4c)
-
-        call rank3_c(Er3,pt2,pt4,qt,1,kap2bp4c)
-
-        call rank3_c(Er3,pt3,pt3,pt4,1,p3ap3bp4c)
-
-        call rank3_c(Er3,pt3,pt3,qt,1,kap3bp3c)
-
-        call rank3_c(Er3,pt3,pt4,pt4,1,p3ap4bp4c)
-
-        call rank3_c(Er3,pt3,pt4,qt,1,kap3bp4c)
-
-        call rank3_c(Er3,pt4,pt4,qt,1,kap4bp4c)
-
-        call rank3_c(Er3,pt1,pt4,qt,2,gabkc)
-
-        call rank3_c(Er3,pt1,pt4,pt1,2,gabp1c)
-
-        call rank3_c(Er3,pt1,pt4,pt2,2,gabp2c)
-
-        call rank3_c(Er3,pt1,pt4,pt3,2,gabp3c)
-
-        call rank3_c(Er3,pt1,pt4,pt4,2,gabp4c)
-
-
-	elmat=0d0
-*****SOLO IL ROUTING 5 È USATO, PERÒ LASCIO COMUNQUE IL CODICE COMMENTATO SE MAI SERVISSERO DEI TEST
-
-	if(i.eq.1) then
-	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing1.F'
-            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
-
-        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    else
-		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    endif
-
-
-    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing1.F'
-	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
-
-	elseif(i.eq.2) then
-	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing2.F'
-            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
-        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    else
-		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    endif
-
-    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing2.F'
-	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
-	elseif(i.eq.3) then
-  	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing3.F'
-            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
-        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    else
-		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    endif
-
-    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing3.F'
-	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
-	elseif(i.eq.4) then
-    	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing4.F'
-            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
-        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    else
-		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    endif
-    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing4.F'
-	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
-!
-	elseif(i.eq.5) then
-	    include 'mumurad/Virtual/pent_isr_isr_tensor/Routing5.F'
-
-            if(ifc.eq.'is1'.or.ifc.eq.'fs1') then
-
-        	elmat=elmat-elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    else
-		elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s1))
-	    endif
-    	    include 'mumurad/Virtual/pent_isr_fsr_tensor/Routing5.F'
-	    elmat=elmat+elmat1*vpolc(s1)*CONJG(vpolc(s))
-	endif
-      end
-************************
-
-
-*************
-      subroutine routing_pipi(pt1,pt2,pt3,pt4,qt,
-     >		     momvec,mominv,masses,i,j,elmati,elmatf)
-
-#ifdef COLLIER
-        use collier
-#endif
-        implicit none
-
-	double precision pt1(0:3),pt2(0:3),pt3(0:3),pt4(0:3),qt(0:3)
-	double precision pt(0:3)
-	real*8 p1p2,p1p3,p1p4,kp1,p2p3,p2p4,kp2,p3p4,kp3,kp4
-	double precision ame,ammu,convfac,alpha,pi,ame2,ampi2,ampi
-	common/parameters/ame,ammu,convfac,alpha,pi
-        common/hparam/ampi
-
-	double complex tens(1:15)
-	double complex tensuv(1:15)
-
-	character*3 ifc
-
-	double complex masses(0:4)
-	double complex mominv(1:10)
-	double complex momvec(0:3,4)
-
-	double complex E0L
-	double complex Evec(0:3)
-	double complex Er2(0:9),Er2m(0:3,0:3)
-
-	double complex elmati,elmatf,elmat1
-
-	integer i,j,k,l,m,n,o,p
-
-	double complex p1a
-	double complex p2a
-	double complex p3a
-	double complex p4a
-	double complex ka
-
-	double complex gab
-
-	double complex p1ap1b
-	double complex p1ap2b
-	double complex p1ap3b
-	double complex p1ap4b
-	double complex kap1b
-	double complex p2ap2b
-	double complex p2ap3b
-	double complex p2ap4b
-	double complex kap2b
-	double complex p3ap3b
-	double complex p3ap4b
-	double complex kap3b
-	double complex p4ap4b
-	double complex kap4b
-	double complex kakb
-
-
-	external dot
-	double precision dot
-
-        double complex vpolc,alphar
-
-        common/ialpharunning/iarun
-        integer iarun
-
-**********FF
-
-	integer iffpi
-	character*10 what_ffpi
-	common/ffpioption/iffpi,what_ffpi
-	double complex ffpiis
-	double precision ffpiis2
-	double complex ffpifs
-	double precision ffpifs2
-
-**************
-
-       	p1p2 = dot(pt1,pt2)
-	p1p3 = dot(pt1,pt3)
-	p1p4 = dot(pt1,pt4)
-	kp1  = dot(pt1,qt)
-	p2p3 = dot(pt2,pt3)
-	p2p4 = dot(pt2,pt4)
-	kp2  = dot(pt2,qt)
-	kp3 = dot(pt3,qt)
-	p3p4 = dot(pt3,pt4)
-	kp4  = dot(pt4,qt)
-
-**************
-	ffpifs=(1.d0,0.d0)
-	ffpifs2=1.d0
-
-	ffpiis=(1.d0,0.d0)
-	ffpiis2=1.d0
-	if(iffpi.gt.0) then
-		call ffpi(2.d0*(ame**2+p1p2),ffpifs,ffpifs2)
-		call ffpi(2.d0*(ampi**2+p3p4),ffpiis,ffpiis2)
-
-	endif
-
-******ALPHA RUNNING
-	ffpiis=ffpiis*vpolc(2.d0*(ampi**2+p3p4))
-	ffpiis2=ffpiis*CONJG(ffpiis)
-
-	ffpifs=ffpifs*vpolc(2.d0*(ame**2+p1p2))
-	ffpifs2=ffpifs*CONJG(ffpifs)
-****************
-
-#ifdef COLLIER
-
-	call Eten_cll(tens,tensuv,momvec,mominv,masses,2)
-!        call SetMode_cll(2)
-#endif
-
-
-
-************QUI PRENDIAMO I VARI ELEMENTI DI TENS E ISOLIAMO QUELLO SCALARE, VETTORIALE, TENSORIALE DI RANK2 E 3
-
-	E0L=tens(1)
-
-	Evec(0)=tens(2)
-	Evec(1)=tens(3)
-	Evec(2)=tens(4)
-	Evec(3)=tens(5)
-
-	Er2(0)=tens(6)
-	Er2(1)=tens(7)
-	Er2(2)=tens(8)
-	Er2(3)=tens(9)
-	Er2(4)=tens(10)
-	Er2(5)=tens(11)
-	Er2(6)=tens(12)
-	Er2(7)=tens(13)
-	Er2(8)=tens(14)
-	Er2(9)=tens(15)
-
-	Er2m(0,0)=Er2(0)
-	Er2m(0,1)=Er2(1)
-	Er2m(1,0)=Er2(1)
-	Er2m(2,0)=Er2(2)
-	Er2m(0,2)=Er2(2)
-	Er2m(3,0)=Er2(3)
-	Er2m(0,3)=Er2(3)
-	Er2m(1,1)=Er2(4)
-	Er2m(1,2)=Er2(5)
-	Er2m(2,1)=Er2(5)
-	Er2m(1,3)=Er2(6)
-	Er2m(3,1)=Er2(6)
-	Er2m(2,2)=Er2(7)
-	Er2m(2,3)=Er2(8)
-	Er2m(3,2)=Er2(8)
-	Er2m(3,3)=Er2(9)
-
-***************vettoriali
-
-	p1a=dot(pt1,REAL(Evec))+(0.d0,1.d0)*dot(pt1,AIMAG(Evec))
-	p2a=dot(pt2,REAL(Evec))+(0.d0,1.d0)*dot(pt2,AIMAG(Evec))
-	p3a=dot(pt3,REAL(Evec))+(0.d0,1.d0)*dot(pt3,AIMAG(Evec))
-	p4a=dot(pt4,REAL(Evec))+(0.d0,1.d0)*dot(pt4,AIMAG(Evec))
-	ka=dot(qt,REAL(Evec))+(0.d0,1.d0)*dot(qt,AIMAG(Evec))
-
-
-*********rango 2
-
-	call rank2_c(Er2,pt3,qt,2,gab)
-
-	call rank2_c(Er2,pt1,pt1,1,p1ap1b)
-
-	call rank2_c(Er2,pt1,pt2,1,p1ap2b)
-
-	call rank2_c(Er2,pt1,pt3,1,p1ap3b)
-
-	call rank2_c(Er2,pt1,pt4,1,p1ap4b)
-
-	call rank2_c(Er2,pt1,qt,1,kap1b)
-
-	call rank2_c(Er2,pt2,pt2,1,p2ap2b)
-
-	call rank2_c(Er2,pt2,pt3,1,p2ap3b)
-
-	call rank2_c(Er2,pt2,pt4,1,p2ap4b)
-
-	call rank2_c(Er2,pt2,qt,1,kap2b)
-
-	call rank2_c(Er2,pt3,pt3,1,p3ap3b)
-
-	call rank2_c(Er2,pt3,pt4,1,p3ap4b)
-
-	call rank2_c(Er2,pt3,qt,1,kap3b)
-
-	call rank2_c(Er2,pt4,pt4,1,p4ap4b)
-
-	call rank2_c(Er2,pt4,qt,1,kap4b)
-
-	call rank2_c(Er2,qt,qt,1,kakb)
-
-
-
-
-	elmati=(0.d0,0.d0)
-	elmatf=(0.d0,0.d0)
-	if(i.eq.1) then
-	  if(j.eq.1) then
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/ISR/Pent_Routing1_isr1.F'
-	elmati=real(elmat1*CONJG(ffpiis)*ffpifs)
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/FSR/Pent_Routing1_fsr1.F'
-	elmatf=elmat1*ffpifs2
-	  elseif(j.eq.3) then
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing1_isr3.F'
-	elmati=elmat1*ffpiis2
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing1_fsr3.F'
-	elmatf=real(elmat1*(ffpiis*CONJG(ffpifs)))
-
-	  endif
-	elseif(i.eq.2) then
-	  if(j.eq.1) then
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/ISR/Pent_Routing2_isr1.F'
-	elmati=real(elmat1*CONJG(ffpiis)*ffpifs)
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/FSR/Pent_Routing2_fsr1.F'
-	elmatf=elmat1*ffpifs2
-	  elseif(j.eq.3) then
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing2_isr3.F'
-	elmati=elmat1*ffpiis2
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing2_fsr3.F'
-	elmatf=real(elmat1*(ffpiis*CONJG(ffpifs)))
-	  endif
-	elseif(i.eq.3) then
-	  if(j.eq.1) then
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/ISR/Pent_Routing3_isr1.F'
-	elmati=real(elmat1*CONJG(ffpiis)*ffpifs)
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/FSR/Pent_Routing3_fsr1.F'
-	elmatf=elmat1*ffpifs2
-	  elseif(j.eq.3) then
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing3_isr3.F'
-	elmati=elmat1*ffpiis2
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing3_fsr3.F'
-	elmatf=real(elmat1*(ffpiis*CONJG(ffpifs)))
-	  endif
-	elseif(i.eq.4) then
-	  if(j.eq.1) then
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/ISR/Pent_Routing4_isr1.F'
-	elmati=real(elmat1*CONJG(ffpiis)*ffpifs)
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/FSR/Pent_Routing4_fsr1.F'
-	elmatf=elmat1*ffpifs2
-	  elseif(j.eq.3) then
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing4_isr3.F'
-	elmati=elmat1*ffpiis2
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing4_fsr3.F'
-	elmatf=real(elmat1*(ffpiis*CONJG(ffpifs)))
-	  endif
-	elseif(i.eq.5) then
-	  if(j.eq.1) then
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/ISR/Pent_Routing5_isr1.F'
-	elmati=real(elmat1*CONJG(ffpiis)*ffpifs)
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_1/FSR/Pent_Routing5_fsr1.F'
-	elmatf=elmat1*ffpifs2
-	  elseif(j.eq.3) then
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing5_isr3.F'
-	elmati=elmat1*ffpiis2
-  include 'pipirad/Virtual/IFI_PENT/DIAGRAM_3/Pent_Routing5_fsr3.F'
-	elmatf=real(elmat1*(ffpiis*CONJG(ffpifs)))
-	  endif
-       endif
-      end
-
-
 *********************
       function tridot(p,q)
       implicit double precision (a-h,o-z)

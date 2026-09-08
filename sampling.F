@@ -320,6 +320,208 @@ cccc     .      +phard/anhard/(a-b*om)**(1.d0+alpha))
       return
       end
 ***************************************************
+      subroutine sp_disp(spmin,spmax,sp,w)
+      double complex sp
+      double precision spmin,spmax,theta_min,theta_max
+      double precision norm,mr,gr,w
+      double precision csi(1)
+
+      call getrnd(csi,1)
+      gr = 1.39624775d-1
+      mr = 7.55179041d-1 
+      
+
+      norm = mr*gr*(atan((mr**2-spmin)/gr/mr)-atan((mr**2-spmax)
+     >     /gr/mr))
+      theta_min = atan((mr**2 - spmin)/(gr*mr))
+      theta_max = atan((mr**2 - spmax)/(gr*mr))
+      
+      sp = (mr**2 - gr*mr * tan(theta_min + csi(1)*(theta_max
+     >     - theta_min)))*(1.d0,0.d0)
+      
+      w = 1.d0/(1.d0 + ((mr**2 - sp)/(gr*mr))**2)/norm
+
+      return
+      end
+
+      subroutine sp_pv(spmin,spmax,mxx2,sp,w)
+      double complex sp, spgen
+      double precision spmin,spmax,mxx2,w
+      double precision norm,mr,gr,csi(1)
+      double precision yminf,ymaxf,neff,i2x
+      double precision r,sreal,salt,p1s,p1alt,ptot
+      double precision p1
+      external p1
+      double precision norm3, p3s, r2
+      double precision a1, a2, a3
+
+      gr = 1.39624775d-1
+      mr = 7.55179041d-1
+
+c     pesi dei canali 
+      a1 = 1.d0 / 10.d0
+      a2 = 1.d0 / 10.d0
+      a3 = 4.d0 / 5.d0
+
+c     calcolo della normalizzazione globale BW
+      norm = mr*gr*(datan((mr**2-spmin)/gr/mr)-datan((mr**2-spmax)
+     1      /gr/mr))
+
+c     1. calcolo dell'efficienza i2x per il canale 2
+      yminf = dmax1(spmin, 2.d0*mxx2 - spmax)
+      ymaxf = dmin1(spmax, 2.d0*mxx2 - spmin)
+
+      if (yminf .lt. ymaxf) then
+         neff = mr*gr*(datan((mr**2-yminf)/gr/mr)
+     1        - datan((mr**2-ymaxf)/gr/mr))
+         i2x = neff / norm
+      else
+         i2x = 0.d0
+      endif
+
+c     normalizzazione per il canale 3 (1/s)
+      norm3 = dlog(spmax/spmin)
+
+c     2. ciclo multi-channel con rigetto interno
+ 10   continue
+!      call getrnd(csi,1)
+      call getrnd(csi,1)
+      r = csi(1)
+
+      if (r .lt. a1) then
+c        --- canale 1: estrazione diretta BW ---
+         call sp_disp(spmin, spmax, sp, p1s)
+         sreal = dble(sp)
+         
+      else if (r .lt. a1+a2) then
+c        --- canale 2: estrazione specchiata BW ---
+         call sp_disp(spmin, spmax, spgen, p1alt)
+         sreal = 2.d0*mxx2 - dble(spgen)
+         
+c        se il punto specchiato esce dai limiti, rigetta
+         if (sreal .lt. spmin .or. sreal .gt. spmax) goto 10
+         sp = dcmplx(sreal, 0.d0)
+         
+      else
+c        --- canale 3: estrazione 1/s ---
+         call sp_oosp(spmin,spmax,sp,w)
+         sreal = dble(sp)
+         sp = dcmplx(sreal, 0.d0)
+      endif
+
+
+c     Densità canale 1
+      p1s = p1(sreal,norm,mr,gr)
+      
+c     Densità canale 2 
+      salt = 2.d0*mxx2 - sreal
+      if (salt .ge. spmin .and. salt .le. spmax) then
+         p1alt = p1(salt,norm,mr,gr)
+      else
+         p1alt = 0.d0
+      endif
+      
+c     Densità canale 3 (1/s)
+      p3s = 1.d0 / (sreal * norm3)
+
+c     Efficienza Canale 1 = 1, Canale 2 = i2x, Canale 3 = 1
+      ptot = (a1 * p1s + a2 * p1alt + a3 * p3s) 
+     1     / (a1 * 1.d0 + a2 * i2x + a3 * 1.d0)
+
+c     restituiamo la probabilita totale in w
+      w = ptot
+
+      return
+      end
+      
+
+      double precision function p1(sval,norm,mr,gr)
+      double precision sval,norm,mr,gr
+
+      p1 = 1.d0/(1.d0 + ((mr**2 - sval)/(gr*mr))**2)/norm
+
+      return
+      end
+
+
+
+
+      
+
+      subroutine sp_oosp(spmin,spmax,sp,w)
+      double complex sp
+      double precision spmin,spmax,theta_min,theta_max
+      double precision norm,mr,gr,w
+      double precision csi(1)
+
+      call getrnd(csi,1) 
+      
+!      csi(1)=1.d0
+      norm = log(spmax/spmin)
+      
+      sp = spmin*exp(norm*csi(1))*(1.d0,0.d0)
+      w = 1.d0/real(sp)/norm
+
+      return
+      end
+
+
+      subroutine sp_multich(spmin,spmax,imff,sp,w)
+      implicit none
+      double complex sp
+      double precision spmin,spmax,theta_min,theta_max
+      double precision norm,mr,gr,w
+      double precision csi(1)
+      double precision imff,p1,p2,sum
+
+!!!   Multichannel with eq probability
+      gr = 1.39624775d-1
+      mr = 7.55179041d-1    
+
+      
+      imff = abs(imff)
+      sum  = imff + 1.d0
+      
+      call getrnd(csi,1)
+
+      p1 = 1.d0/sum
+      p2 = imff/sum
+
+      if(csi(1).le.p1) then
+         norm = (mr*gr)**2*(atan((mr**2-spmin)/gr/mr)-atan((mr**2-spmax)
+     >        /gr/mr))
+         theta_min = atan((mr**2 - spmin)/(gr*mr))
+         theta_max = atan((mr**2 - spmax)/(gr*mr))
+         call getrnd(csi,1)
+         sp = (mr**2 - gr*mr * tan(theta_min + csi(1)*(theta_max
+     >        - theta_min)))*(1.d0,0.d0)
+      else
+         norm = log(spmax/spmin)   
+         call getrnd(csi,1)
+         sp = spmin*exp(norm*csi(1))*(1.d0,0.d0)
+      endif
+
+      w= (p1/(1.d0 + ((mr**2 - sp)/(gr*mr))**2)+
+     >     p2/real(sp))/norm
+      
+      return
+      end
+
+      
+      subroutine sp_flat(spmin,spmax,sp,w)
+      double complex sp
+      double precision spmin,spmax,theta_min,theta_max
+      double precision norm,mr,gr,w
+      double precision csi(1)
+
+      call getrnd(csi,1)
+
+      norm = (spmax-spmin)
+      sp = (spmin +(spmax-spmin)*csi(1))*(1.d0,0.d0)
+      w = 1.d0/norm
+
+      return
+      end
 
 ***************************************************
       subroutine photon_energy_FSok(omin,omax,om,w)

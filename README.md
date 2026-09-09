@@ -1,10 +1,8 @@
 # BabaYaga@NLO
 
-`BabaYaga@NLO` is an event generator for Bhabha scattering, $\mu^+\mu^-$,
-$\pi^+\pi^-$, photon pair production and radiative channels $\mu^+\mu^-\gamma$,
-$\pi^+\pi^-\gamma$ at flavour factories currently developed by E. Budassi,
-C.M. Carloni Calame, M. Ghilardi, A. Gurgone, G. Montagna, M. Moretti,
-O. Nicrosini, F. Piccinini and F.P. Ucci. [(*)](#footnote)
+`BabaYaga@NLO` is an event generator for Bhabha scattering, $\mu^+\mu^-$, $\pi^+\pi^-$, photon pair production and
+radiative channels $\mu^+\mu^-\gamma$, $\pi^+\pi^-\gamma$ at flavour factories currently developed by
+C.M. Carloni Calame, M. Ghilardi, A. Gurgone, G. Montagna, M. Moretti, O. Nicrosini, F. Piccinini and F.P. Ucci. [(*)](#footnote)
 
 ## Compiling and running the code
 
@@ -27,15 +25,15 @@ To verify that the installation was successful, run:
 The test may take a few minutes to complete. If the setup is correct, the terminal will display:
 `CHECK OK, CORRECT INSTALLATION`
 
-### Compiling the Wrapped Version
+### Compiling the embedded version
 
-A template main driver (`driver_gen_events.F`) is provided as a minimal example of calling the event generator wrapper routine.
+A template main driver (`driver_gen_events.F`) is provided as a minimal example of calling the event generator as a routine.
 
-To compile the wrapped version, run:
+To compile the embedded version, run:
 
 ```bash
 make libbabayagafull.a
-gfortran -O3 -fPIC driver_gen_events.F libbabayagafull.a -o babayaga-wrap
+gfortran -O3 -fPIC driver_gen_events.F libbabayagafull.a -o babayaga-routine
 ```
 
 ## External programs
@@ -129,14 +127,14 @@ run.
 - `saveevents` &rarr; if saving an ascii file where weighted or unweighted (according to `mode`) events are save. The file is `path/events.dat`.
 - `iffpi` — How the pion form factor $F_\pi(q^2)$ is introduced in the calculation:
 
-  - **For radiative $\pi^+\pi^-\gamma$ (pr):**
+  - For radiative $\pi^+\pi^-\gamma$ (pr):
     - `0` → Pion form factor off
     - `1` → Pion form factor $\text{F}\times\text{sQED}$
     - `2` → Pion form factor GVMD
     - `3` → Pion form factor FsQED
 
 
-  - **For $\pi^+\pi^-$ production (pp):**
+  - For $\pi^+\pi^-$ production (pp):
     - `0` → Pion form factor off
     - `1` → Pion form factor $\text{F}\times\text{sQED}$
     - `2` → Pion form factor GVMD
@@ -149,13 +147,13 @@ run.
     - `1` → Final-State corrections evaluated in GVMD or FsQED (depending on whether `iffpi = 2` or `3`)
 	
 - `what_ffpi` &rarr; to set which parametrization of the pion form factor must be used.
-- `arun`	  &rarr; sets $\alpha(s)$ routine:
+- `arun`	  &rarr; sets $\alpha(q^2)$ routine:
  	- `off`   &rarr; sets alpha running off
 	- `nsk`   &rarr; `NSK` parameterization by Fedor Ignatov
 	- `hadr5` &rarr; `HADR5N16` routine
 	- `hmnt`  &rarr; `HMNT` routine
-- `mode` &rarr; sets if the requested number of events (nev) are weighted or unweighted
-- `eps` &rarr; sets the soft/hard photon energy separator, in ecms/2 units.
+- `mode` &rarr; sets if the requested number of events (nev) are `weighted` or `unweighted`
+- `eps` &rarr; sets the soft/hard photon energy separator, in `ecms/2` units.
 		Results are completely independent from its choice (provided it is small)
 - `ord` &rarr; it sets which photonic radiative corrections are included:
 	- `born` means Born cross section,
@@ -174,13 +172,13 @@ run.
 
   > **REMARK:** These corrections are suited for describing processes at center-of-mass energies up to $\sqrt{s} \simeq 1\text{ GeV}$.
 
-  * **First digit (0/1):** Controls whether $\chi\text{PT}$ bremsstrahlung corrections are active (`1`) or off (`0`).
-  * **Second digit (0/1/2/3):** Controls direct $\phi$ decays through scalar mesons ($\sigma, f_0$):
+  * First digit (0/1): Controls whether $\chi\text{PT}$ bremsstrahlung corrections are active (`1`) or off (`0`).
+  * Second digit (0/1/2/3): Controls direct $\phi$ decays through scalar mesons ($\sigma, f_0$):
     * `0` → Off
     * `1` → KK model, as in [arXiv:0706.3027](https://arxiv.org/abs/0706.3027)
     * `2` → "No structure" model, as in [arXiv:0706.3027](https://arxiv.org/abs/0706.3027)
     * `3` → KLOE model, as in [arXiv:hep-ph/0512047](https://arxiv.org/abs/hep-ph/0512047)
-  * **Third digit (0/1):** Controls double-resonant $\phi$ decays (off = `0`, on = `1`). When active, it is implemented as in [arXiv:0706.3027](https://arxiv.org/abs/0706.3027).
+  * Third digit (0/1): Controls double-resonant $\phi$ decays (off = `0`, on = `1`). When active, it is implemented as in [arXiv:0706.3027](https://arxiv.org/abs/0706.3027).
 
 
 ## User modifiable routines
@@ -233,4 +231,4 @@ Andrea, Carlo, Ettore, Francesco, Fulvio, Guido, Marco, Mauro, Oreste
 <br>
 
 #### Footnote
-Former developers include G. Balossini, L. Barze`and C. Bignamini.
+Former developers include G. Balossini, L. Barz&egrave;, E. Budassi and C. Bignamini.

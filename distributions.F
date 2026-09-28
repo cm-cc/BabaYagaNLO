@@ -257,9 +257,9 @@ c     .     /
          bma(14) = cos(thmine)
 
          bmi(15) = cos(thmine)
-         bma(15) = 1.d0
+         bma(15) = 1.d0+1d-10
 
-         bmi(16) = -1.d0
+         bmi(16) = -1.d0-1.d-10
          bma(16) = cos(thmaxe)
 
          bmi(17) = -1d0

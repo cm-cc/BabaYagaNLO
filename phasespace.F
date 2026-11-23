@@ -1090,7 +1090,7 @@ c      klast = -10
 c     q2mincut = 2.d0*m1*m1+2.d0*emin*emin*(1.d0-bmin*bmin*cos(zmax)) ! bug
 c     q2mincut = 2.d0*m1*m1+2.d0*emin*emin*(1.d0+bmin*bmin*cos(zmax)) ! another bug!
          q2mincut = 0.d0
-         q2min    = max(q2min,q2mincut,amassainvmin)
+         q2min    = max(q2min,q2mincut,amassainvmin**2)
 
          q2max = ro - eps*2.d0*Emaxgamma*alam
 ! i.e.         q2max = ro - esoft*2.d0*alam !
